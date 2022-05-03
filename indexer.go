@@ -6,26 +6,26 @@ type Provider interface {
 	// TODO: add missing functions
 }
 
-// Database interface of needed database functions
-type Database interface {
+// Writer interface of write function
+type Writer interface {
 	// TODO: add missing functions
 }
 
 // Indexer struc handler for Indexer functions
 type Indexer struct {
 	provider Provider
-	database Database
+	writer   Writer
 }
 
 // NewIndexer returns Indexer instance with given input
-func NewIndexer(provider Provider, database Database) *Indexer {
+func NewIndexer(provider Provider, writer Writer) *Indexer {
 	return &Indexer{
 		provider: provider,
-		database: database,
+		writer:   writer,
 	}
 }
 
 // IndexBlock transfers all transactions to a known strcuture and saves them
-func (i *Indexer) IndexBlock(block int) error {
+func (i *Indexer) IndexBlock(blockHeight int) error {
 	return nil
 }
