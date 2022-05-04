@@ -5,13 +5,13 @@ import (
 )
 
 type Transaction struct {
-	hash     string
-	sender   string
-	receiver string
-	amount   big.Int
-	fee      big.Int
-	height   int
-	code     int
-	status   string
-	memo     string
+	Hash     string
+	Sender   string
+	Receiver string
+	Amount   big.Int
+	Fee      big.Int
+	Height   int
+	Code     int
+	Status   string
+	Memo     string
 }

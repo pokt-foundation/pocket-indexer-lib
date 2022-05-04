@@ -1,14 +1,18 @@
 package indexer
 
 import (
+	"math/big"
+	"strconv"
+
+	"github.com/pokt-foundation/pocket-go/provider"
 	"github.com/pokt-foundation/pocket-indexer/types"
 )
 
 // Provider interface of needed provider functions
 type Provider interface {
 	GetBlockHeight() (int, error)
-	GetBlock(blockHeight int) (*types.Block, error)
-	GetBlockTransactions(blockHeight int) ([]*types.Transaction, error)
+	GetBlock(blockHeight int) (*provider.GetBlockOutput, error)
+	GetBlockTransactions(blockHeight int) (*provider.GetBlockTransactionsOutput, error)
 }
 
 // Persistance layer interface (database, in-memory, etc.)
@@ -38,10 +42,19 @@ func NewIndexer(provider Provider, persistance Persistance) *Indexer {
 
 // IndexBlock converts block details to a known structure and saves them
 func (i *Indexer) IndexBlock(blockHeight int) (*types.Block, error) {
-	block, err := i.provider.GetBlock(blockHeight)
+	blockOutput, err := i.provider.GetBlock(blockHeight)
 
 	if err != nil {
 		return nil, err
+	}
+
+	totalTxs, err := strconv.Atoi(blockOutput.Block.Header.TotalTxs)
+
+	block := &types.Block{
+		Height:    blockHeight,
+		TxCount:   totalTxs,
+		Producer:  blockOutput.Block.Header.ProposerAddress,
+		Timestamp: blockOutput.Block.Header.Time,
 	}
 
 	err = i.persistance.WriteBlock(block)
@@ -55,17 +68,48 @@ func (i *Indexer) IndexBlock(blockHeight int) (*types.Block, error) {
 
 // IndexBlock converts block transactions to a known structure and saves them
 func (i *Indexer) IndexBlockTransactions(blockHeight int) ([]*types.Transaction, error) {
-	blockTransactions, err := i.provider.GetBlockTransactions(blockHeight)
+	blockTransactionsOutput, err := i.provider.GetBlockTransactions(blockHeight)
 
 	if err != nil {
 		return nil, err
 	}
 
-	err = i.persistance.WriteTransactions(blockTransactions)
+	var status = "SUCCESS"
+
+	txs := make([]*types.Transaction, 0)
+
+	for _, transaction := range blockTransactionsOutput.Txs {
+
+		if transaction.TxResult.Code != 0 {
+			status = "FAILURE"
+		}
+
+		fee, err := strconv.Atoi(transaction.StdTx.Fee[0].Amount)
+
+		if err != nil {
+			return nil, err
+		}
+
+		tx := &types.Transaction{
+			Status:   status,
+			Hash:     transaction.Hash,
+			Sender:   transaction.TxResult.Signer,
+			Receiver: transaction.TxResult.Recipient,
+			Height:   transaction.Height,
+			Code:     transaction.TxResult.Code,
+			Fee:      *big.NewInt(int64(fee)),
+			Amount:   *big.NewInt(int64(0)),
+			Memo:     transaction.StdTx.Memo,
+		}
+
+		txs = append(txs, tx)
+	}
+
+	err = i.persistance.WriteTransactions(txs)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return blockTransactions, nil
+	return txs, nil
 }

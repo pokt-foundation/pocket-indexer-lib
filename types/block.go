@@ -5,9 +5,8 @@ import (
 )
 
 type Block struct {
-	height     int
-	txCount    int
-	relayCount int
-	producer   string
-	timestamp  time.Time
+	Height    int
+	TxCount   int
+	Producer  string
+	Timestamp time.Time
 }
