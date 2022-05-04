@@ -7,14 +7,15 @@ import (
 // Provider interface of needed provider functions
 type Provider interface {
 	GetBlockHeight() (int, error)
-	// TODO: add missing functions
+	GetBlock(blockHeight int) (*types.Block, error)
+	GetBlockTransactions(blockHeight int) ([]*types.Transaction, error)
 }
 
 // Persistance layer interface (database, in-memory, etc.)
 type Persistance interface {
 	// Writes
-	WriteBlock(block *types.Block) error
-	WriteTransactions(txs []*types.Transaction) error
+	WriteBlock(block types.Block) error
+	WriteTransactions(txs []types.Transaction) error
 	// Reads
 	ReadBlock(blockHeight int) (*types.Block, error)
 	ReadBlockTransactions(blockHeight int) ([]*types.Transaction, error)
