@@ -65,7 +65,7 @@ func (i *Indexer) IndexBlock(blockHeight int) (*types.Block, error) {
 	return block, nil
 }
 
-// IndexBlock converts block transactions to a known structure and saves them
+// IndexBlockTransactions converts block transactions to a known structure and saves them
 func (i *Indexer) IndexBlockTransactions(blockHeight int) ([]*types.Transaction, error) {
 	blockTransactionsOutput, err := i.provider.GetBlockTransactions(blockHeight)
 

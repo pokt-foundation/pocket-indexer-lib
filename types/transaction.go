@@ -1,5 +1,6 @@
 package types
 
+// Transaction struct to be stored in persistance layer
 type Transaction struct {
 	Hash     string
 	Sender   string
