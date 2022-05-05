@@ -1,7 +1,6 @@
 package indexer
 
 import (
-	"math/big"
 	"strconv"
 
 	"github.com/pokt-foundation/pocket-go/provider"
@@ -84,11 +83,15 @@ func (i *Indexer) IndexBlockTransactions(blockHeight int) ([]*types.Transaction,
 			status = "FAILURE"
 		}
 
-		fee, err := strconv.Atoi(transaction.StdTx.Fee[0].Amount)
+		val, ok := blockTransactionsOutput.Txs[0].StdTx.Msg.Value["amount"]
 
-		if err != nil {
-			return nil, err
+		if !ok {
+			return nil, nil
 		}
+
+		amount := val.(string)
+
+		fee := transaction.StdTx.Fee[0].Amount
 
 		tx := &types.Transaction{
 			Status:   status,
@@ -97,8 +100,8 @@ func (i *Indexer) IndexBlockTransactions(blockHeight int) ([]*types.Transaction,
 			Receiver: transaction.TxResult.Recipient,
 			Height:   transaction.Height,
 			Code:     transaction.TxResult.Code,
-			Fee:      *big.NewInt(int64(fee)),
-			Amount:   *big.NewInt(int64(0)),
+			Fee:      fee,
+			Amount:   amount,
 			Memo:     transaction.StdTx.Memo,
 		}
 

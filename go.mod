@@ -2,7 +2,7 @@ module github.com/pokt-foundation/pocket-indexer
 
 go 1.18
 
-require github.com/pokt-foundation/pocket-go v0.9.1
+require github.com/pokt-foundation/pocket-go v0.9.2
 
 require (
 	github.com/gojektech/heimdall v5.0.2+incompatible // indirect
