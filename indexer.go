@@ -17,9 +17,9 @@ type Persistance interface {
 	WriteBlock(block *provider.GetBlockOutput) error
 	WriteTransactions(txs []*provider.Transaction) error
 	// Reads
-	ReadBlock(blockHeight int) interface{}
-	ReadBlockTransactions(blockHeight int) []interface{}
-	ReadTransaction(hash string) interface{}
+	ReadBlock(blockHeight int) (interface{}, error)
+	ReadTransaction(hash string) (interface{}, error)
+	ReadBlockTransactions(blockHeight int) ([]interface{}, error)
 }
 
 // Indexer struc handler for Indexer functions
@@ -47,7 +47,7 @@ func (i *Indexer) IndexBlock(blockHeight int) error {
 	writeErr := i.persistance.WriteBlock(blockOutput)
 
 	if writeErr != nil {
-		return err
+		return writeErr
 	}
 
 	return nil
@@ -70,7 +70,7 @@ func (i *Indexer) IndexBlockTransactions(blockHeight int) error {
 	writeErr := i.persistance.WriteTransactions(txs)
 
 	if writeErr != nil {
-		return err
+		return writeErr
 	}
 
 	return nil
