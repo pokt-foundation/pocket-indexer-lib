@@ -1,4 +1,4 @@
-module github.com/pokt-foundation/pocket-indexer
+module github.com/pokt-foundation/pocket-indexer-lib
 
 go 1.18
 

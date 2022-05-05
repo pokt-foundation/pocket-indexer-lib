@@ -4,7 +4,7 @@ import (
 	"strconv"
 
 	"github.com/pokt-foundation/pocket-go/provider"
-	"github.com/pokt-foundation/pocket-indexer/types"
+	"github.com/pokt-foundation/pocket-indexer-lib/types"
 )
 
 // Provider interface of needed provider functions
