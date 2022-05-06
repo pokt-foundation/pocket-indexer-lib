@@ -7,10 +7,6 @@ github.com/jarcoal/httpmock v1.1.0 h1:F47ChZj1Y2zFsCXxNkBPwNNKnAyOATcdQibk0qEdVC
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
-github.com/pokt-foundation/pocket-go v0.9.0 h1:kBUKvxSjIGpkwixl85CLhUBGkO1eZsdPGShOkC7VVbs=
-github.com/pokt-foundation/pocket-go v0.9.0/go.mod h1:qpEVm6OBOWlaGfoJm9iwAxY+yiglrfFMDHlRB+wnxz8=
-github.com/pokt-foundation/pocket-go v0.9.1 h1:iwox0f5ckZc+8oVWbxXe9NEh75FbNraYBVGG+ytERwc=
-github.com/pokt-foundation/pocket-go v0.9.1/go.mod h1:qpEVm6OBOWlaGfoJm9iwAxY+yiglrfFMDHlRB+wnxz8=
 github.com/pokt-foundation/pocket-go v0.9.2 h1:mFwR47gRIuBTZSR+2+nmXwEswqFkjl54TeadJq+3KXI=
 github.com/pokt-foundation/pocket-go v0.9.2/go.mod h1:qpEVm6OBOWlaGfoJm9iwAxY+yiglrfFMDHlRB+wnxz8=
 github.com/stretchr/testify v1.7.0 h1:nwc3DEeHmmLAfoZucVR881uASk0Mfjw8xYJ99tb5CcY=

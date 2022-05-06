@@ -11,28 +11,28 @@ type Provider interface {
 	GetBlockTransactions(blockHeight int) (*provider.GetBlockTransactionsOutput, error)
 }
 
-// Persistance layer interface (database, in-memory, etc.)
-type Persistance interface {
+// Persistence layer interface (database, in-memory, etc.)
+type Persistence interface {
 	// Writes
 	WriteBlock(block *provider.GetBlockOutput) error
 	WriteTransactions(txs []*provider.Transaction) error
 	// Reads
 	ReadBlock(blockHeight int) (interface{}, error)
 	ReadTransaction(hash string) (interface{}, error)
-	ReadBlockTransactions(blockHeight int) ([]interface{}, error)
+	ReadBlockTransactions(blockHeight int) (map[string]interface{}, error)
 }
 
 // Indexer struc handler for Indexer functions
 type Indexer struct {
 	provider    Provider
-	persistance Persistance
+	persistence Persistence
 }
 
 // NewIndexer returns Indexer instance with given input
-func NewIndexer(provider Provider, persistance Persistance) *Indexer {
+func NewIndexer(provider Provider, persistence Persistence) *Indexer {
 	return &Indexer{
 		provider:    provider,
-		persistance: persistance,
+		persistence: persistence,
 	}
 }
 
@@ -44,7 +44,7 @@ func (i *Indexer) IndexBlock(blockHeight int) error {
 		return err
 	}
 
-	writeErr := i.persistance.WriteBlock(blockOutput)
+	writeErr := i.persistence.WriteBlock(blockOutput)
 
 	if writeErr != nil {
 		return writeErr
@@ -61,13 +61,7 @@ func (i *Indexer) IndexBlockTransactions(blockHeight int) error {
 		return err
 	}
 
-	txs := make([]*provider.Transaction, 0)
-
-	for _, transaction := range blockTransactionsOutput.Txs {
-		txs = append(txs, transaction)
-	}
-
-	writeErr := i.persistance.WriteTransactions(txs)
+	writeErr := i.persistence.WriteTransactions(blockTransactionsOutput.Txs)
 
 	if writeErr != nil {
 		return writeErr
