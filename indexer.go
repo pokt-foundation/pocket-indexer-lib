@@ -1,71 +1,150 @@
 package indexer
 
 import (
+	"strconv"
+
 	"github.com/pokt-foundation/pocket-go/provider"
 )
 
 // Provider interface of needed provider functions
 type Provider interface {
 	GetBlockHeight() (int, error)
-	GetBlock(blockHeight int) (*provider.GetBlockOutput, error)
-	GetBlockTransactions(blockHeight int) (*provider.GetBlockTransactionsOutput, error)
+	GetBlock(blockNumber int) (*provider.GetBlockOutput, error)
+	GetBlockTransactions(blockHeight int, options *provider.GetBlockTransactionsOptions) (*provider.GetBlockTransactionsOutput, error)
 }
 
-// Persistence layer interface (database, in-memory, etc.)
-type Persistence interface {
+// Writer interface for write methods to index
+type Writer interface {
 	// Writes
-	WriteBlock(block *provider.GetBlockOutput) error
-	WriteTransactions(txs []*provider.Transaction) error
-	// Reads
-	ReadBlock(blockHeight int) (interface{}, error)
-	ReadTransaction(hash string) (interface{}, error)
-	ReadBlockTransactions(blockHeight int) (map[string]interface{}, error)
+	WriteBlock(block *Block) error
+	WriteTransactions(txs []*Transaction) error
 }
 
 // Indexer struc handler for Indexer functions
 type Indexer struct {
-	provider    Provider
-	persistence Persistence
+	provider Provider
+	writer   Writer
 }
 
 // NewIndexer returns Indexer instance with given input
-func NewIndexer(provider Provider, persistence Persistence) *Indexer {
+func NewIndexer(provider Provider, writer Writer) *Indexer {
 	return &Indexer{
-		provider:    provider,
-		persistence: persistence,
+		provider: provider,
+		writer:   writer,
 	}
 }
 
-// IndexBlock converts block details to a known structure and saves them
-func (i *Indexer) IndexBlock(blockHeight int) error {
-	blockOutput, err := i.provider.GetBlock(blockHeight)
+// Transaction struct handler of all transaction fields to be indexed
+type Transaction struct {
+	ID              int
+	Hash            string
+	FromAddress     string
+	ToAddress       string
+	AppPubKey       string
+	Blockchains     []string
+	MessageType     string
+	Height          int
+	Index           int
+	Proof           *provider.TransactionProof
+	StdTx           *provider.StdTx
+	TxResult        *provider.TxResult
+	Tx              string
+	Entropy         int
+	Fee             int
+	FeeDenomination string
+}
 
-	if err != nil {
-		return err
+func convertProvTransactionToTransaction(provTransaction *provider.Transaction) *Transaction {
+	var fromAddress, toAddress string
+	var blockChains []string
+
+	stdTx := provTransaction.StdTx
+	msgValues := stdTx.Msg.Value
+	feeStruct := stdTx.Fee[0]
+
+	rawFromAddress, ok := msgValues["from_address"].(string)
+	if ok {
+		fromAddress = rawFromAddress
 	}
 
-	writeErr := i.persistence.WriteBlock(blockOutput)
-
-	if writeErr != nil {
-		return writeErr
+	rawToAddress, ok := msgValues["to_address"].(string)
+	if ok {
+		toAddress = rawToAddress
 	}
 
-	return nil
+	rawBlockChains, ok := msgValues["chains"].([]any)
+	if ok {
+		for _, rawBlockChain := range rawBlockChains {
+			blockChain, ok := rawBlockChain.(string)
+			if ok {
+				blockChains = append(blockChains, blockChain)
+			}
+		}
+	}
+
+	fee, _ := strconv.Atoi(feeStruct.Amount)
+
+	return &Transaction{
+		Hash:            provTransaction.Hash,
+		FromAddress:     fromAddress,
+		ToAddress:       toAddress,
+		AppPubKey:       stdTx.Signature.PubKey,
+		Blockchains:     blockChains,
+		MessageType:     stdTx.Msg.Type,
+		Height:          provTransaction.Height,
+		Index:           provTransaction.Index,
+		Proof:           provTransaction.Proof,
+		StdTx:           stdTx,
+		TxResult:        provTransaction.TxResult,
+		Tx:              provTransaction.Tx,
+		Entropy:         int(stdTx.Entropy),
+		Fee:             fee,
+		FeeDenomination: feeStruct.Denom,
+	}
 }
 
 // IndexBlockTransactions converts block transactions to a known structure and saves them
 func (i *Indexer) IndexBlockTransactions(blockHeight int) error {
-	blockTransactionsOutput, err := i.provider.GetBlockTransactions(blockHeight)
-
+	// TODO: add pagination support
+	blockTransactionsOutput, err := i.provider.GetBlockTransactions(blockHeight, nil)
 	if err != nil {
 		return err
 	}
 
-	writeErr := i.persistence.WriteTransactions(blockTransactionsOutput.Txs)
+	var transactions []*Transaction
 
-	if writeErr != nil {
-		return writeErr
+	for _, tx := range blockTransactionsOutput.Txs {
+		transactions = append(transactions, convertProvTransactionToTransaction(tx))
+	}
+
+	err = i.writer.WriteTransactions(transactions)
+	if err != nil {
+		return err
 	}
 
 	return nil
+}
+
+// Block struct handler of all block field to be indexed
+// TODO: implement this struct
+type Block struct{}
+
+// IndexBlock converts block details to a known structure and saves them
+func (i *Indexer) IndexBlock(blockHeight int) error {
+	blockOutput, err := i.provider.GetBlock(blockHeight)
+	if err != nil {
+		return err
+	}
+
+	err = i.writer.WriteBlock(convertProvBlockToBlock(blockOutput))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// TODO: implement this function correctly
+func convertProvBlockToBlock(provBlock *provider.GetBlockOutput) *Block {
+	return &Block{}
 }
