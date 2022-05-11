@@ -18,7 +18,7 @@ type Writer interface {
 	WriteTransactions(txs []*Transaction) error
 }
 
-// Indexer struc handler for Indexer functions
+// Indexer struct handler for Indexer functions
 type Indexer struct {
 	provider Provider
 	writer   Writer
@@ -52,11 +52,11 @@ type Transaction struct {
 	FeeDenomination string
 }
 
-func convertProvTransactionToTransaction(provTransaction *provider.Transaction) *Transaction {
+func convertProviderTransactionToTransaction(providerTransaction *provider.Transaction) *Transaction {
 	var fromAddress, toAddress string
 	var blockChains []string
 
-	stdTx := provTransaction.StdTx
+	stdTx := providerTransaction.StdTx
 	msgValues := stdTx.Msg.Value
 	feeStruct := stdTx.Fee[0]
 
@@ -83,18 +83,18 @@ func convertProvTransactionToTransaction(provTransaction *provider.Transaction) 
 	fee, _ := strconv.Atoi(feeStruct.Amount)
 
 	return &Transaction{
-		Hash:            provTransaction.Hash,
+		Hash:            providerTransaction.Hash,
 		FromAddress:     fromAddress,
 		ToAddress:       toAddress,
 		AppPubKey:       stdTx.Signature.PubKey,
 		Blockchains:     blockChains,
 		MessageType:     stdTx.Msg.Type,
-		Height:          provTransaction.Height,
-		Index:           provTransaction.Index,
-		Proof:           provTransaction.Proof,
+		Height:          providerTransaction.Height,
+		Index:           providerTransaction.Index,
+		Proof:           providerTransaction.Proof,
 		StdTx:           stdTx,
-		TxResult:        provTransaction.TxResult,
-		Tx:              provTransaction.Tx,
+		TxResult:        providerTransaction.TxResult,
+		Tx:              providerTransaction.Tx,
 		Entropy:         int(stdTx.Entropy),
 		Fee:             fee,
 		FeeDenomination: feeStruct.Denom,
@@ -112,7 +112,7 @@ func (i *Indexer) IndexBlockTransactions(blockHeight int) error {
 	var transactions []*Transaction
 
 	for _, tx := range blockTransactionsOutput.Txs {
-		transactions = append(transactions, convertProvTransactionToTransaction(tx))
+		transactions = append(transactions, convertProviderTransactionToTransaction(tx))
 	}
 
 	err = i.writer.WriteTransactions(transactions)
@@ -123,7 +123,7 @@ func (i *Indexer) IndexBlockTransactions(blockHeight int) error {
 	return nil
 }
 
-// Block struct handler of all block field to be indexed
+// Block struct handler of all block fields to be indexed
 // TODO: implement this struct
 type Block struct{}
 
@@ -134,7 +134,7 @@ func (i *Indexer) IndexBlock(blockHeight int) error {
 		return err
 	}
 
-	err = i.writer.WriteBlock(convertProvBlockToBlock(blockOutput))
+	err = i.writer.WriteBlock(convertProviderBlockToBlock(blockOutput))
 	if err != nil {
 		return err
 	}
@@ -143,6 +143,6 @@ func (i *Indexer) IndexBlock(blockHeight int) error {
 }
 
 // TODO: implement this function correctly
-func convertProvBlockToBlock(provBlock *provider.GetBlockOutput) *Block {
+func convertProviderBlockToBlock(providerBlock *provider.GetBlockOutput) *Block {
 	return &Block{}
 }

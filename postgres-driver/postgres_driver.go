@@ -41,7 +41,8 @@ func NewPostgresDriverFromSQLDBInstance(db *sql.DB) *PostgresDriver {
 	}
 }
 
-type transaction struct {
+// dbTransaction is struct handler for the transaction with types needed for Postgres processing
+type dbTransaction struct {
 	ID              int            `db:"id"`
 	Hash            string         `db:"hash"`
 	FromAddress     string         `db:"from_address"`
@@ -60,7 +61,7 @@ type transaction struct {
 	FeeDenomination string         `db:"fee_denomination"`
 }
 
-func (t *transaction) toIndexerTransaction() *indexer.Transaction {
+func (t *dbTransaction) toIndexerTransaction() *indexer.Transaction {
 	return &indexer.Transaction{
 		Hash:            t.Hash,
 		FromAddress:     t.FromAddress,
@@ -80,8 +81,8 @@ func (t *transaction) toIndexerTransaction() *indexer.Transaction {
 	}
 }
 
-func convertIndexerTransactionToTransaction(indexerTransaction *indexer.Transaction) *transaction {
-	return &transaction{
+func convertIndexerTransactionToDBTransaction(indexerTransaction *indexer.Transaction) *dbTransaction {
+	return &dbTransaction{
 		Hash:            indexerTransaction.Hash,
 		FromAddress:     indexerTransaction.FromAddress,
 		ToAddress:       indexerTransaction.ToAddress,
@@ -102,10 +103,10 @@ func convertIndexerTransactionToTransaction(indexerTransaction *indexer.Transact
 
 // WriteTransactions inserts given transactions to the database
 func (d *PostgresDriver) WriteTransactions(txs []*indexer.Transaction) error {
-	var transactions []*transaction
+	var transactions []*dbTransaction
 
 	for _, tx := range txs {
-		transactions = append(transactions, convertIndexerTransactionToTransaction(tx))
+		transactions = append(transactions, convertIndexerTransactionToDBTransaction(tx))
 	}
 
 	_, err := d.NamedExec(insertTransactionsScript, transactions)
@@ -119,7 +120,7 @@ func (d *PostgresDriver) WriteTransactions(txs []*indexer.Transaction) error {
 // ReadTransactions returns all transactions on the database
 // TODO: add pagination
 func (d *PostgresDriver) ReadTransactions() ([]*indexer.Transaction, error) {
-	var transactions []*transaction
+	var transactions []*dbTransaction
 
 	err := d.Select(&transactions, selectAllTransactionsScript)
 	if err != nil {
@@ -128,8 +129,8 @@ func (d *PostgresDriver) ReadTransactions() ([]*indexer.Transaction, error) {
 
 	var indexerTransactions []*indexer.Transaction
 
-	for _, transaction := range transactions {
-		indexerTransactions = append(indexerTransactions, transaction.toIndexerTransaction())
+	for _, dbTransaction := range transactions {
+		indexerTransactions = append(indexerTransactions, dbTransaction.toIndexerTransaction())
 	}
 
 	return indexerTransactions, nil
@@ -137,14 +138,14 @@ func (d *PostgresDriver) ReadTransactions() ([]*indexer.Transaction, error) {
 
 // ReadTransaction returns transaction in the database with given transaction hash
 func (d *PostgresDriver) ReadTransaction(hash string) (*indexer.Transaction, error) {
-	var transaction transaction
+	var dbTransaction dbTransaction
 
-	err := d.Get(&transaction, selectTransactionByHashScript, hash)
+	err := d.Get(&dbTransaction, selectTransactionByHashScript, hash)
 	if err != nil {
 		return nil, err
 	}
 
-	return transaction.toIndexerTransaction(), nil
+	return dbTransaction.toIndexerTransaction(), nil
 }
 
 // TODO: implement WriteBlock func
