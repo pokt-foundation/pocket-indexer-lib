@@ -9,27 +9,24 @@ import (
 	"github.com/jarcoal/httpmock"
 	"github.com/pokt-foundation/pocket-go/mock-client"
 	"github.com/pokt-foundation/pocket-go/provider"
+	testMock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-var forceWriterFail bool
-
-type dummyWriter struct{}
-
-func (w dummyWriter) WriteBlock(block *Block) error {
-	if forceWriterFail {
-		return errors.New("forced failure")
-	}
-
-	return nil
+type writerMock struct {
+	testMock.Mock
 }
 
-func (w dummyWriter) WriteTransactions(txs []*Transaction) error {
-	if forceWriterFail {
-		return errors.New("forced failure")
-	}
+func (w *writerMock) WriteBlock(block *Block) error {
+	args := w.Called(block)
 
-	return nil
+	return args.Error(0)
+}
+
+func (w *writerMock) WriteTransactions(txs []*Transaction) error {
+	args := w.Called(txs)
+
+	return args.Error(0)
 }
 
 func TestIndexer_IndexBlockTransactions(t *testing.T) {
@@ -40,7 +37,9 @@ func TestIndexer_IndexBlockTransactions(t *testing.T) {
 
 	reqProvider := provider.NewProvider("https://dummy.com", []string{})
 
-	indexer := NewIndexer(reqProvider, dummyWriter{})
+	writerMock := &writerMock{}
+
+	indexer := NewIndexer(reqProvider, writerMock)
 
 	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryBlockTXsRoute),
 		http.StatusInternalServerError, "samples/query_block_txs.json")
@@ -51,12 +50,12 @@ func TestIndexer_IndexBlockTransactions(t *testing.T) {
 	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryBlockTXsRoute),
 		http.StatusOK, "samples/query_block_txs.json")
 
-	forceWriterFail = true
+	writerMock.On("WriteTransactions", testMock.Anything).Return(errors.New("forced failure")).Once()
 
 	err = indexer.IndexBlockTransactions(30363)
 	c.EqualError(err, "forced failure")
 
-	forceWriterFail = false
+	writerMock.On("WriteTransactions", testMock.Anything).Return(nil).Once()
 
 	err = indexer.IndexBlockTransactions(30363)
 	c.NoError(err)
@@ -70,7 +69,9 @@ func TestIndexer_IndexBlock(t *testing.T) {
 
 	reqProvider := provider.NewProvider("https://dummy.com", []string{})
 
-	indexer := NewIndexer(reqProvider, dummyWriter{})
+	writerMock := &writerMock{}
+
+	indexer := NewIndexer(reqProvider, writerMock)
 
 	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryBlockRoute),
 		http.StatusInternalServerError, "samples/query_block.json")
@@ -81,12 +82,12 @@ func TestIndexer_IndexBlock(t *testing.T) {
 	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryBlockRoute),
 		http.StatusOK, "samples/query_block.json")
 
-	forceWriterFail = true
+	writerMock.On("WriteBlock", testMock.Anything).Return(errors.New("forced failure")).Once()
 
 	err = indexer.IndexBlock(30363)
 	c.EqualError(err, "forced failure")
 
-	forceWriterFail = false
+	writerMock.On("WriteBlock", testMock.Anything).Return(nil).Once()
 
 	err = indexer.IndexBlock(30363)
 	c.NoError(err)
