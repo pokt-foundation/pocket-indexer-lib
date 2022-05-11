@@ -65,7 +65,7 @@ func TestPostgresDriver_WriteTransactions(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	err = driver.WriteTransactions([]*indexer.Transaction{
+	transactionToSend := []*indexer.Transaction{
 		{
 			Hash:            "AF5BB3EAFF431E2E5E784D639825979FF20A779725BFE61D4521340F70C3996D0",
 			FromAddress:     "addssd",
@@ -78,74 +78,19 @@ func TestPostgresDriver_WriteTransactions(t *testing.T) {
 			FeeDenomination: "upokt",
 			StdTx:           testProvStdTx,
 		},
-	})
-	c.NoError(err)
-}
-
-func TestPostgresDriver_WriteTransactionsFailure(t *testing.T) {
-	c := require.New(t)
-
-	db, mock, err := sqlmock.New()
-	c.NoError(err)
-
-	defer db.Close()
-
-	testProvStdTx := &provider.StdTx{
-		Entropy: 3223323,
-		Fee: []struct {
-			Amount string "json:\"amount\""
-			Denom  string "json:\"denom\""
-		}{
-			{
-				Amount: "10000",
-				Denom:  "upokt",
-			},
-		},
-		Msg: struct {
-			Type  string         "json:\"type\""
-			Value map[string]any "json:\"value\""
-		}{
-			Type: "pos/Send",
-			Value: map[string]any{
-				"from_address": "addssd",
-				"to_address":   "adasd",
-			},
-		},
-		Signature: struct {
-			PubKey    string "json:\"pub_key\""
-			Signature string "json:\"signature\""
-		}{
-			PubKey: "adasdsfd",
-		},
 	}
 
-	testStdTx := &stdTx{
-		StdTx: testProvStdTx,
-	}
-
-	encodedTestStdTx, err := testStdTx.Value()
+	err = driver.WriteTransactions(transactionToSend)
 	c.NoError(err)
 
 	mock.ExpectExec("INSERT into transactions").WithArgs("AF5BB3EAFF431E2E5E784D639825979FF20A779725BFE61D4521340F70C3996D0",
-		"addssd", "adasd", "adasdsfd", nil, "pos/Send", int64(0), int64(0), []uint8{123, 125}, encodedTestStdTx, []uint8{123, 125}, "", int64(3223323), int64(10000), "upokt").
+		"addssd", "adasd", "adasdsfd", pq.StringArray([]string{"0021"}), "pos/Send", int64(0), int64(0), []uint8{123, 125}, encodedTestStdTx,
+		[]uint8{123, 125}, "", int64(3223323), int64(10000), "upokt").
 		WillReturnError(errors.New("dummy error"))
 
-	driver := NewPostgresDriverFromSQLDBInstance(db)
-
-	err = driver.WriteTransactions([]*indexer.Transaction{
-		{
-			Hash:            "AF5BB3EAFF431E2E5E784D639825979FF20A779725BFE61D4521340F70C3996D0",
-			FromAddress:     "addssd",
-			ToAddress:       "adasd",
-			AppPubKey:       "adasdsfd",
-			MessageType:     "pos/Send",
-			Entropy:         3223323,
-			Fee:             10000,
-			FeeDenomination: "upokt",
-			StdTx:           testProvStdTx,
-		},
-	})
+	err = driver.WriteTransactions(transactionToSend)
 	c.EqualError(err, "dummy error")
+
 }
 
 func TestPostgresDriver_ReadTransactions(t *testing.T) {
@@ -188,21 +133,10 @@ func TestPostgresDriver_ReadTransactions(t *testing.T) {
 	transactions, err := driver.ReadTransactions()
 	c.NoError(err)
 	c.Len(transactions, 2)
-}
-
-func TestPostgresDriver_ReadTransactionsFailure(t *testing.T) {
-	c := require.New(t)
-
-	db, mock, err := sqlmock.New()
-	c.NoError(err)
-
-	defer db.Close()
 
 	mock.ExpectQuery("^SELECT (.+) FROM transactions$").WillReturnError(errors.New("dummy error"))
 
-	driver := NewPostgresDriverFromSQLDBInstance(db)
-
-	transactions, err := driver.ReadTransactions()
+	transactions, err = driver.ReadTransactions()
 	c.EqualError(err, "dummy error")
 	c.Empty(transactions)
 }
@@ -246,21 +180,10 @@ func TestPostgresDriver_ReadTransaction(t *testing.T) {
 	transaction, err := driver.ReadTransaction("ABCD")
 	c.NoError(err)
 	c.NotEmpty(transaction)
-}
-
-func TestPostgresDriver_ReadTransactionFailure(t *testing.T) {
-	c := require.New(t)
-
-	db, mock, err := sqlmock.New()
-	c.NoError(err)
-
-	defer db.Close()
 
 	mock.ExpectQuery("^SELECT (.+) FROM transactions (.+)").WillReturnError(errors.New("dummy error"))
 
-	driver := NewPostgresDriverFromSQLDBInstance(db)
-
-	transaction, err := driver.ReadTransaction("ABCD")
+	transaction, err = driver.ReadTransaction("ABCD")
 	c.EqualError(err, "dummy error")
 	c.Empty(transaction)
 }

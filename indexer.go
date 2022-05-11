@@ -8,14 +8,12 @@ import (
 
 // Provider interface of needed provider functions
 type Provider interface {
-	GetBlockHeight() (int, error)
 	GetBlock(blockNumber int) (*provider.GetBlockOutput, error)
 	GetBlockTransactions(blockHeight int, options *provider.GetBlockTransactionsOptions) (*provider.GetBlockTransactionsOutput, error)
 }
 
 // Writer interface for write methods to index
 type Writer interface {
-	// Writes
 	WriteBlock(block *Block) error
 	WriteTransactions(txs []*Transaction) error
 }
