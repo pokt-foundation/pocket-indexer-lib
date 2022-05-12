@@ -3,6 +3,7 @@ package postgresdriver
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/lib/pq"
@@ -90,7 +91,6 @@ func TestPostgresDriver_WriteTransactions(t *testing.T) {
 
 	err = driver.WriteTransactions(transactionToSend)
 	c.EqualError(err, "dummy error")
-
 }
 
 func TestPostgresDriver_ReadTransactions(t *testing.T) {
@@ -186,4 +186,96 @@ func TestPostgresDriver_ReadTransaction(t *testing.T) {
 	transaction, err = driver.ReadTransaction("ABCD")
 	c.EqualError(err, "dummy error")
 	c.Empty(transaction)
+}
+
+func TestPostgresDriver_WriteBlock(t *testing.T) {
+	c := require.New(t)
+
+	db, mock, err := sqlmock.New()
+	c.NoError(err)
+
+	defer db.Close()
+
+	mock.ExpectExec("INSERT into blocks").WithArgs("AF5BB3EAFF431E2E5E784D639825979FF20A779725BFE61D4521340F70C3996D0",
+		21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "A2143929B30CBC3E7A30C2DE06B385BCF874134B", 32, 21).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	driver := NewPostgresDriverFromSQLDBInstance(db)
+
+	err = driver.WriteBlock(&indexer.Block{
+		Hash:            "AF5BB3EAFF431E2E5E784D639825979FF20A779725BFE61D4521340F70C3996D0",
+		Height:          21,
+		Time:            time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local),
+		ProposerAddress: "A2143929B30CBC3E7A30C2DE06B385BCF874134B",
+		TXCount:         32,
+		RelayCount:      21,
+	})
+	c.NoError(err)
+
+	mock.ExpectExec("INSERT into blocks").WithArgs("AF5BB3EAFF431E2E5E784D639825979FF20A779725BFE61D4521340F70C3996D0",
+		21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "A2143929B30CBC3E7A30C2DE06B385BCF874134B", 32, 21).
+		WillReturnError(errors.New("dummy error"))
+
+	err = driver.WriteBlock(&indexer.Block{
+		Hash:            "AF5BB3EAFF431E2E5E784D639825979FF20A779725BFE61D4521340F70C3996D0",
+		Height:          21,
+		Time:            time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local),
+		ProposerAddress: "A2143929B30CBC3E7A30C2DE06B385BCF874134B",
+		TXCount:         32,
+		RelayCount:      21,
+	})
+	c.EqualError(err, "dummy error")
+}
+
+func TestPostgresDriver_ReadBlocks(t *testing.T) {
+	c := require.New(t)
+
+	db, mock, err := sqlmock.New()
+	c.NoError(err)
+
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"id", "hash", "height", "time", "proposer_address", "tx_count", "relay_count"}).
+		AddRow(1, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21, 21).
+		AddRow(2, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21, 21)
+
+	mock.ExpectQuery("^SELECT (.+) FROM blocks$").WillReturnRows(rows)
+
+	driver := NewPostgresDriverFromSQLDBInstance(db)
+
+	blocks, err := driver.ReadBlocks()
+	c.NoError(err)
+	c.Len(blocks, 2)
+
+	mock.ExpectQuery("^SELECT (.+) FROM blocks$").WillReturnError(errors.New("dummy error"))
+
+	blocks, err = driver.ReadBlocks()
+	c.EqualError(err, "dummy error")
+	c.Empty(blocks)
+}
+
+func TestPostgresDriver_ReadBlock(t *testing.T) {
+	c := require.New(t)
+
+	db, mock, err := sqlmock.New()
+	c.NoError(err)
+
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"id", "hash", "height", "time", "proposer_address", "tx_count", "relay_count"}).
+		AddRow(1, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21, 21)
+
+	mock.ExpectQuery("^SELECT (.+) FROM blocks (.+)").WillReturnRows(rows)
+
+	driver := NewPostgresDriverFromSQLDBInstance(db)
+
+	block, err := driver.ReadBlock("ABCD")
+	c.NoError(err)
+	c.NotEmpty(block)
+
+	mock.ExpectQuery("^SELECT (.+) FROM blocks (.+)").WillReturnError(errors.New("dummy error"))
+
+	block, err = driver.ReadBlock("ABCD")
+	c.EqualError(err, "dummy error")
+	c.Empty(block)
 }

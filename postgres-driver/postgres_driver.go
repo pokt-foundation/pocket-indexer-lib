@@ -2,6 +2,7 @@ package postgresdriver
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -12,8 +13,13 @@ const (
 	insertTransactionsScript = `
 	INSERT into transactions (hash, from_address, to_address, app_pub_key, blockchains, message_type, height, index, proof, stdtx, tx_result, tx, entropy, fee, fee_denomination)
 	VALUES (:hash, :from_address, :to_address, :app_pub_key, :blockchains, :message_type, :height, :index, :proof, :stdtx, :tx_result, :tx, :entropy, :fee, :fee_denomination)`
+	insertBlockScript = `
+	INSERT into blocks (hash, height, time, proposer_address, tx_count, relay_count)
+	VALUES (:hash, :height, :time, :proposer_address, :tx_count, :relay_count)`
 	selectAllTransactionsScript   = "SELECT * FROM transactions"
+	selectAllBlocksScript         = "SELECT * FROM blocks"
 	selectTransactionByHashScript = "SELECT * FROM transactions WHERE hash = $1"
+	selectBlockByHashScript       = "SELECT * FROM blocks WHERE hash = $1"
 )
 
 // PostgresDriver struct handler for PostgresDB related functions
@@ -148,4 +154,78 @@ func (d *PostgresDriver) ReadTransaction(hash string) (*indexer.Transaction, err
 	return dbTransaction.toIndexerTransaction(), nil
 }
 
-// TODO: implement WriteBlock func
+// dbBlock is struct handler for the block with types needed for Postgres processing
+type dbBlock struct {
+	ID              int       `db:"id"`
+	Hash            string    `db:"hash"`
+	Height          int       `db:"height"`
+	Time            time.Time `db:"time"`
+	ProposerAddress string    `db:"proposer_address"`
+	TXCount         int       `db:"tx_count"`
+	RelayCount      int       `db:"relay_count"`
+}
+
+func (b *dbBlock) toIndexerBlock() *indexer.Block {
+	return &indexer.Block{
+		Hash:            b.Hash,
+		Height:          b.Height,
+		Time:            b.Time,
+		ProposerAddress: b.ProposerAddress,
+		TXCount:         b.TXCount,
+		RelayCount:      b.RelayCount,
+	}
+}
+
+func convertIndexerBlockToDBBlock(indexerBlock *indexer.Block) *dbBlock {
+	return &dbBlock{
+		Hash:            indexerBlock.Hash,
+		Height:          indexerBlock.Height,
+		Time:            indexerBlock.Time,
+		ProposerAddress: indexerBlock.ProposerAddress,
+		TXCount:         indexerBlock.TXCount,
+		RelayCount:      indexerBlock.RelayCount,
+	}
+}
+
+// WriteBlock inserts given block to the database
+func (d *PostgresDriver) WriteBlock(block *indexer.Block) error {
+	dbBlock := convertIndexerBlockToDBBlock(block)
+
+	_, err := d.NamedExec(insertBlockScript, dbBlock)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ReadBlocks returns all blocks on the database
+// TODO: add pagination
+func (d *PostgresDriver) ReadBlocks() ([]*indexer.Block, error) {
+	var blocks []*dbBlock
+
+	err := d.Select(&blocks, selectAllBlocksScript)
+	if err != nil {
+		return nil, err
+	}
+
+	var indexerBlocks []*indexer.Block
+
+	for _, block := range blocks {
+		indexerBlocks = append(indexerBlocks, block.toIndexerBlock())
+	}
+
+	return indexerBlocks, nil
+}
+
+// ReadBlock returns block in the database with given block hash
+func (d *PostgresDriver) ReadBlock(hash string) (*indexer.Block, error) {
+	var dbBlock dbBlock
+
+	err := d.Get(&dbBlock, selectBlockByHashScript, hash)
+	if err != nil {
+		return nil, err
+	}
+
+	return dbBlock.toIndexerBlock(), nil
+}
