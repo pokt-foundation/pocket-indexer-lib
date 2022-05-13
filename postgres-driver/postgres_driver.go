@@ -11,8 +11,8 @@ import (
 
 const (
 	insertTransactionsScript = `
-	INSERT into transactions (hash, from_address, to_address, app_pub_key, blockchains, message_type, height, index, proof, stdtx, tx_result, tx, entropy, fee, fee_denomination)
-	VALUES (:hash, :from_address, :to_address, :app_pub_key, :blockchains, :message_type, :height, :index, :proof, :stdtx, :tx_result, :tx, :entropy, :fee, :fee_denomination)`
+	INSERT into transactions (hash, from_address, to_address, app_pub_key, blockchains, message_type, height, index, stdtx, tx_result, tx, entropy, fee, fee_denomination)
+	VALUES (:hash, :from_address, :to_address, :app_pub_key, :blockchains, :message_type, :height, :index, :stdtx, :tx_result, :tx, :entropy, :fee, :fee_denomination)`
 	insertBlockScript = `
 	INSERT into blocks (hash, height, time, proposer_address, tx_count, relay_count)
 	VALUES (:hash, :height, :time, :proposer_address, :tx_count, :relay_count)`
@@ -58,7 +58,6 @@ type dbTransaction struct {
 	MessageType     string         `db:"message_type"`
 	Height          int            `db:"height"`
 	Index           int            `db:"index"`
-	Proof           *proof         `db:"proof"`
 	StdTx           *stdTx         `db:"stdtx"`
 	TxResult        *txResult      `db:"tx_result"`
 	Tx              string         `db:"tx"`
@@ -77,7 +76,6 @@ func (t *dbTransaction) toIndexerTransaction() *indexer.Transaction {
 		MessageType:     t.MessageType,
 		Height:          t.Height,
 		Index:           t.Index,
-		Proof:           t.Proof.TransactionProof,
 		StdTx:           t.StdTx.StdTx,
 		TxResult:        t.TxResult.TxResult,
 		Tx:              t.Tx,
@@ -97,7 +95,6 @@ func convertIndexerTransactionToDBTransaction(indexerTransaction *indexer.Transa
 		MessageType:     indexerTransaction.MessageType,
 		Height:          indexerTransaction.Height,
 		Index:           indexerTransaction.Index,
-		Proof:           &proof{TransactionProof: indexerTransaction.Proof},
 		StdTx:           &stdTx{StdTx: indexerTransaction.StdTx},
 		TxResult:        &txResult{TxResult: indexerTransaction.TxResult},
 		Tx:              indexerTransaction.Tx,

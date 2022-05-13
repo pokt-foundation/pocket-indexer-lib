@@ -43,7 +43,6 @@ type Transaction struct {
 	MessageType     string
 	Height          int
 	Index           int
-	Proof           *provider.TransactionProof
 	StdTx           *provider.StdTx
 	TxResult        *provider.TxResult
 	Tx              string
@@ -91,7 +90,6 @@ func convertProviderTransactionToTransaction(providerTransaction *provider.Trans
 		MessageType:     stdTx.Msg.Type,
 		Height:          providerTransaction.Height,
 		Index:           providerTransaction.Index,
-		Proof:           providerTransaction.Proof,
 		StdTx:           stdTx,
 		TxResult:        providerTransaction.TxResult,
 		Tx:              providerTransaction.Tx,
@@ -108,8 +106,8 @@ func (i *Indexer) IndexBlockTransactions(blockHeight int) error {
 
 	for {
 		blockTransactionsOutput, err := i.provider.GetBlockTransactions(blockHeight, &provider.GetBlockTransactionsOptions{
-			Prove: true,
-			Page:  currentPage,
+			Page:    currentPage,
+			PerPage: 10000,
 		})
 		if err != nil {
 			return err
