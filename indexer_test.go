@@ -47,8 +47,13 @@ func TestIndexer_IndexBlockTransactions(t *testing.T) {
 	err := indexer.IndexBlockTransactions(30363)
 	c.Equal(provider.Err5xxOnConnection, err)
 
-	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryBlockTXsRoute),
-		http.StatusOK, "samples/query_block_txs.json")
+	mock.AddMultipleMockedResponses(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryBlockTXsRoute),
+		http.StatusOK, []string{
+			"samples/query_block_txs.json",
+			"samples/query_block_txs_empty.json",
+			"samples/query_block_txs.json",
+			"samples/query_block_txs_empty.json",
+		})
 
 	writerMock.On("WriteTransactions", testMock.Anything).Return(errors.New("forced failure")).Once()
 

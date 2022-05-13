@@ -103,19 +103,34 @@ func convertProviderTransactionToTransaction(providerTransaction *provider.Trans
 
 // IndexBlockTransactions converts block transactions to a known structure and saves them
 func (i *Indexer) IndexBlockTransactions(blockHeight int) error {
-	// TODO: add pagination support
-	blockTransactionsOutput, err := i.provider.GetBlockTransactions(blockHeight, nil)
-	if err != nil {
-		return err
+	currentPage := 1
+	var providerTxs []*provider.Transaction
+
+	for {
+		blockTransactionsOutput, err := i.provider.GetBlockTransactions(blockHeight, &provider.GetBlockTransactionsOptions{
+			Prove: true,
+			Page:  currentPage,
+		})
+		if err != nil {
+			return err
+		}
+
+		if blockTransactionsOutput.PageCount == 0 {
+			break
+		}
+
+		providerTxs = append(providerTxs, blockTransactionsOutput.Txs...)
+
+		currentPage++
 	}
 
 	var transactions []*Transaction
 
-	for _, tx := range blockTransactionsOutput.Txs {
+	for _, tx := range providerTxs {
 		transactions = append(transactions, convertProviderTransactionToTransaction(tx))
 	}
 
-	err = i.writer.WriteTransactions(transactions)
+	err := i.writer.WriteTransactions(transactions)
 	if err != nil {
 		return err
 	}
