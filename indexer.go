@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"strconv"
+	"time"
 
 	"github.com/pokt-foundation/pocket-go/provider"
 )
@@ -34,7 +35,6 @@ func NewIndexer(provider Provider, writer Writer) *Indexer {
 
 // Transaction struct handler of all transaction fields to be indexed
 type Transaction struct {
-	ID              int
 	Hash            string
 	FromAddress     string
 	ToAddress       string
@@ -124,8 +124,14 @@ func (i *Indexer) IndexBlockTransactions(blockHeight int) error {
 }
 
 // Block struct handler of all block fields to be indexed
-// TODO: implement this struct
-type Block struct{}
+type Block struct {
+	Hash            string
+	Height          int
+	Time            time.Time
+	ProposerAddress string
+	TXCount         int
+	RelayCount      int
+}
 
 // IndexBlock converts block details to a known structure and saves them
 func (i *Indexer) IndexBlock(blockHeight int) error {
@@ -142,7 +148,18 @@ func (i *Indexer) IndexBlock(blockHeight int) error {
 	return nil
 }
 
-// TODO: implement this function correctly
 func convertProviderBlockToBlock(providerBlock *provider.GetBlockOutput) *Block {
-	return &Block{}
+	blockHeader := providerBlock.Block.Header
+
+	height, _ := strconv.Atoi(blockHeader.Height)
+	totalTxs, _ := strconv.Atoi(blockHeader.TotalTxs)
+
+	return &Block{
+		Hash:            providerBlock.BlockID.Hash,
+		Height:          height,
+		Time:            blockHeader.Time,
+		ProposerAddress: blockHeader.ProposerAddress,
+		TXCount:         totalTxs,
+		RelayCount:      0, // TODO: add correct RelayCount
+	}
 }
