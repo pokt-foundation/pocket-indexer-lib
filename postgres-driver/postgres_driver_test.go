@@ -60,7 +60,7 @@ func TestPostgresDriver_WriteTransactions(t *testing.T) {
 	c.NoError(err)
 
 	mock.ExpectExec("INSERT into transactions").WithArgs("AF5BB3EAFF431E2E5E784D639825979FF20A779725BFE61D4521340F70C3996D0",
-		"addssd", "adasd", "adasdsfd", pq.StringArray([]string{"0021"}), "pos/Send", int64(0), int64(0), []uint8{123, 125}, encodedTestStdTx,
+		"addssd", "adasd", "adasdsfd", pq.StringArray([]string{"0021"}), "pos/Send", int64(0), int64(0), encodedTestStdTx,
 		[]uint8{123, 125}, "", int64(3223323), int64(10000), "upokt").
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
@@ -85,7 +85,7 @@ func TestPostgresDriver_WriteTransactions(t *testing.T) {
 	c.NoError(err)
 
 	mock.ExpectExec("INSERT into transactions").WithArgs("AF5BB3EAFF431E2E5E784D639825979FF20A779725BFE61D4521340F70C3996D0",
-		"addssd", "adasd", "adasdsfd", pq.StringArray([]string{"0021"}), "pos/Send", int64(0), int64(0), []uint8{123, 125}, encodedTestStdTx,
+		"addssd", "adasd", "adasdsfd", pq.StringArray([]string{"0021"}), "pos/Send", int64(0), int64(0), encodedTestStdTx,
 		[]uint8{123, 125}, "", int64(3223323), int64(10000), "upokt").
 		WillReturnError(errors.New("dummy error"))
 
@@ -115,16 +115,9 @@ func TestPostgresDriver_ReadTransactions(t *testing.T) {
 	encodedTxResult, err := testTxResult.Value()
 	c.NoError(err)
 
-	testProof := &proof{
-		TransactionProof: &provider.TransactionProof{},
-	}
-
-	encodedTestProof, err := testProof.Value()
-	c.NoError(err)
-
-	rows := sqlmock.NewRows([]string{"id", "hash", "from_address", "to_address", "stdtx", "tx_result", "proof"}).
-		AddRow(1, "ABCD", "abcd", "dbcv", encodedTestStdTx, encodedTxResult, encodedTestProof).
-		AddRow(2, "ABFD", "abfd", "fbcv", encodedTestStdTx, encodedTxResult, encodedTestProof)
+	rows := sqlmock.NewRows([]string{"id", "hash", "from_address", "to_address", "stdtx", "tx_result"}).
+		AddRow(1, "ABCD", "abcd", "dbcv", encodedTestStdTx, encodedTxResult).
+		AddRow(2, "ABFD", "abfd", "fbcv", encodedTestStdTx, encodedTxResult)
 
 	mock.ExpectQuery("^SELECT (.+) FROM transactions$").WillReturnRows(rows)
 
@@ -163,15 +156,8 @@ func TestPostgresDriver_ReadTransaction(t *testing.T) {
 	encodedTxResult, err := testTxResult.Value()
 	c.NoError(err)
 
-	testProof := &proof{
-		TransactionProof: &provider.TransactionProof{},
-	}
-
-	encodedTestProof, err := testProof.Value()
-	c.NoError(err)
-
-	rows := sqlmock.NewRows([]string{"id", "hash", "from_address", "to_address", "stdtx", "tx_result", "proof"}).
-		AddRow(1, "ABCD", "abcd", "dbcv", encodedTestStdTx, encodedTxResult, encodedTestProof)
+	rows := sqlmock.NewRows([]string{"id", "hash", "from_address", "to_address", "stdtx", "tx_result"}).
+		AddRow(1, "ABCD", "abcd", "dbcv", encodedTestStdTx, encodedTxResult)
 
 	mock.ExpectQuery("^SELECT (.+) FROM transactions (.+)").WillReturnRows(rows)
 

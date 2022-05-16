@@ -35,28 +35,6 @@ func (r *txResult) Scan(value any) error {
 	return json.Unmarshal(b, &r)
 }
 
-// proof is a wrapper for provider.TransactionProof to implement interfaces for JSONB parsing
-type proof struct {
-	*provider.TransactionProof
-}
-
-// Make the proof struct implement the driver.Valuer interface. This method
-// simply returns the JSON-encoded representation of the struct.
-func (p *proof) Value() (driver.Value, error) {
-	return json.Marshal(p)
-}
-
-// Make the proof struct implement the sql.Scanner interface. This method
-// simply decodes a JSON-encoded value into the struct fields.
-func (p *proof) Scan(value any) error {
-	b, ok := value.([]byte)
-	if !ok {
-		return ErrByteTypeAssertionFailed
-	}
-
-	return json.Unmarshal(b, &p)
-}
-
 // stdTx is a wrapper for provider.StdTx to implement interfaces for JSONB parsing
 type stdTx struct {
 	*provider.StdTx
