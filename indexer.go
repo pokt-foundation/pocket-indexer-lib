@@ -1,10 +1,18 @@
 package indexer
 
 import (
+	"errors"
 	"strconv"
 	"time"
 
 	"github.com/pokt-foundation/pocket-go/provider"
+)
+
+var (
+	// ErrNoTransactionsToIndex error when there are no transactions to index
+	ErrNoTransactionsToIndex = errors.New("no transactions to index")
+	// ErrBlockHasNoHash error when block hash no hash
+	ErrBlockHasNoHash = errors.New("block to index has no hash")
 )
 
 // Provider interface of needed provider functions
@@ -122,6 +130,10 @@ func (i *Indexer) IndexBlockTransactions(blockHeight int) error {
 		currentPage++
 	}
 
+	if len(providerTxs) == 0 {
+		return ErrNoTransactionsToIndex
+	}
+
 	var transactions []*Transaction
 
 	for _, tx := range providerTxs {
@@ -151,6 +163,10 @@ func (i *Indexer) IndexBlock(blockHeight int) error {
 	blockOutput, err := i.provider.GetBlock(blockHeight)
 	if err != nil {
 		return err
+	}
+
+	if blockOutput.BlockID.Hash == "" {
+		return ErrBlockHasNoHash
 	}
 
 	err = i.writer.WriteBlock(convertProviderBlockToBlock(blockOutput))

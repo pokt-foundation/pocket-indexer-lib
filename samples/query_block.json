@@ -79,5 +79,12 @@
           "block": "10"
         }
       }
-    }
+    },
+    "block_id": {
+      "hash": "DC6109DB96D2CBEB6507737A1496704F9BECA1DDB48BF975D1871361D211734C",
+      "parts": {
+          "hash": "674AB0AA1E32F18FF9338A31176491DEFE1617AA2336A1BE9DA5AE215FCF92DE",
+          "total": "1"
+      }
+  }
 }
