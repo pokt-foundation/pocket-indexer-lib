@@ -265,3 +265,36 @@ func TestPostgresDriver_ReadBlock(t *testing.T) {
 	c.EqualError(err, "dummy error")
 	c.Empty(block)
 }
+
+func TestPostgresDriver_GetMaxHeightInBlocks(t *testing.T) {
+	c := require.New(t)
+
+	db, mock, err := sqlmock.New()
+	c.NoError(err)
+
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"max"}).AddRow(100)
+
+	mock.ExpectQuery("^SELECT (.+) FROM blocks").WillReturnRows(rows)
+
+	driver := NewPostgresDriverFromSQLDBInstance(db)
+
+	maxHeight, err := driver.GetMaxHeightInBlocks()
+	c.NoError(err)
+	c.Equal(int64(100), maxHeight)
+
+	rows = sqlmock.NewRows([]string{"max"}).AddRow(nil)
+
+	mock.ExpectQuery("^SELECT (.+) FROM blocks").WillReturnRows(rows)
+
+	maxHeight, err = driver.GetMaxHeightInBlocks()
+	c.Equal(ErrNoPreviousHeight, err)
+	c.Empty(maxHeight)
+
+	mock.ExpectQuery("^SELECT (.+) FROM blocks").WillReturnError(errors.New("dummy error"))
+
+	maxHeight, err = driver.GetMaxHeightInBlocks()
+	c.EqualError(err, "dummy error")
+	c.Empty(maxHeight)
+}

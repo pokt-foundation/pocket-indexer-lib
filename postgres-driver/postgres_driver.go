@@ -2,6 +2,7 @@ package postgresdriver
 
 import (
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -20,6 +21,12 @@ const (
 	selectAllBlocksScript         = "SELECT * FROM blocks"
 	selectTransactionByHashScript = "SELECT * FROM transactions WHERE hash = $1"
 	selectBlockByHashScript       = "SELECT * FROM blocks WHERE hash = $1"
+	selectMaxHeightFromBlocks     = "SELECT MAX(height) FROM blocks"
+)
+
+var (
+	// ErrNoPreviousHeight error when no previos height is stored
+	ErrNoPreviousHeight = errors.New("no previous height stored")
 )
 
 // PostgresDriver struct handler for PostgresDB related functions
@@ -225,4 +232,22 @@ func (d *PostgresDriver) ReadBlock(hash string) (*indexer.Block, error) {
 	}
 
 	return dbBlock.toIndexerBlock(), nil
+}
+
+// GetMaxHeightInBlocks returns max height saved on blocks' table
+func (d *PostgresDriver) GetMaxHeightInBlocks() (int64, error) {
+	row := d.QueryRow(selectMaxHeightFromBlocks)
+
+	var maxHeight sql.NullInt64
+
+	err := row.Scan(&maxHeight)
+	if err != nil {
+		return 0, err
+	}
+
+	if !maxHeight.Valid {
+		return 0, ErrNoPreviousHeight
+	}
+
+	return maxHeight.Int64, nil
 }
