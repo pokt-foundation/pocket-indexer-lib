@@ -22,19 +22,13 @@ func TestPostgresDriver_WriteTransactions(t *testing.T) {
 
 	testProvStdTx := &provider.StdTx{
 		Entropy: 3223323,
-		Fee: []struct {
-			Amount string "json:\"amount\""
-			Denom  string "json:\"denom\""
-		}{
+		Fee: []*provider.Fee{
 			{
 				Amount: "10000",
 				Denom:  "upokt",
 			},
 		},
-		Msg: struct {
-			Type  string         "json:\"type\""
-			Value map[string]any "json:\"value\""
-		}{
+		Msg: &provider.TxMsg{
 			Type: "pos/Send",
 			Value: map[string]any{
 				"from_address": "addssd",
@@ -44,10 +38,7 @@ func TestPostgresDriver_WriteTransactions(t *testing.T) {
 				},
 			},
 		},
-		Signature: struct {
-			PubKey    string "json:\"pub_key\""
-			Signature string "json:\"signature\""
-		}{
+		Signature: &provider.TxSignature{
 			PubKey: "adasdsfd",
 		},
 	}
