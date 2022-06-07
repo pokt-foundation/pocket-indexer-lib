@@ -222,7 +222,7 @@ type ReadTransactionsByAddressOptions struct {
 
 // ReadTransactionsByAddress returns transactions with given from address
 // Optional values defaults: page: 1, perPage: 1000
-func (d *PostgresDriver) ReadTransactionsByAddress(address string, options *ReadTransactionsOptions) ([]*indexer.Transaction, error) {
+func (d *PostgresDriver) ReadTransactionsByAddress(address string, options *ReadTransactionsByAddressOptions) ([]*indexer.Transaction, error) {
 	if !utils.ValidateAddress(address) {
 		return nil, ErrInvalidAddress
 	}
