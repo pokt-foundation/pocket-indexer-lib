@@ -4,11 +4,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"regexp"
 	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
+	"github.com/pokt-foundation/pocket-go/utils"
 	indexer "github.com/pokt-foundation/pocket-indexer-lib"
 )
 
@@ -40,7 +40,6 @@ const (
 
 	defaultPerPage = 1000
 	defaultPage    = 1
-	addressLength  = 40
 )
 
 var (
@@ -48,8 +47,6 @@ var (
 	ErrNoPreviousHeight = errors.New("no previous height stored")
 	// ErrInvalidFromAddress error when given from address is invalid
 	ErrInvalidFromAddress = errors.New("invalid from address")
-
-	addressRegex = regexp.MustCompile("^[a-f0-9]+$")
 )
 
 // PostgresDriver struct handler for PostgresDB related functions
@@ -227,14 +224,10 @@ type ReadTransactionsByFromAddressOptions struct {
 	Page    int
 }
 
-func validateAddress(fromAddress string) bool {
-	return addressRegex.MatchString(fromAddress) && len(fromAddress) == addressLength
-}
-
 // ReadTransactionsByFromAddress returns transactions with given from address
 // Optinal values defaults: page: 1, perPage: 1000
 func (d *PostgresDriver) ReadTransactionsByFromAddress(fromAddress string, options *ReadTransactionsOptions) ([]*indexer.Transaction, error) {
-	if !validateAddress(fromAddress) {
+	if !utils.ValidateAddress(fromAddress) {
 		return nil, ErrInvalidFromAddress
 	}
 
