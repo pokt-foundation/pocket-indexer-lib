@@ -129,7 +129,7 @@ func TestPostgresDriver_ReadTransactions(t *testing.T) {
 	c.Empty(transactions)
 }
 
-func TestPostgresDriver_ReadTransactionsByFromAddress(t *testing.T) {
+func TestPostgresDriver_ReadTransactionsByAddress(t *testing.T) {
 	c := require.New(t)
 
 	db, mock, err := sqlmock.New()
@@ -161,11 +161,11 @@ func TestPostgresDriver_ReadTransactionsByFromAddress(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	transactions, err := driver.ReadTransactionsByFromAddress(";DROP DATABASE;", &ReadTransactionsOptions{Page: 2, PerPage: 3})
-	c.Equal(ErrInvalidFromAddress, err)
+	transactions, err := driver.ReadTransactionsByAddress(";DROP DATABASE;", &ReadTransactionsOptions{Page: 2, PerPage: 3})
+	c.Equal(ErrInvalidAddress, err)
 	c.Empty(transactions)
 
-	transactions, err = driver.ReadTransactionsByFromAddress("1f32488b1db60fe528ab21e3cc26c96696be3faa", &ReadTransactionsOptions{Page: 2, PerPage: 3})
+	transactions, err = driver.ReadTransactionsByAddress("1f32488b1db60fe528ab21e3cc26c96696be3faa", &ReadTransactionsOptions{Page: 2, PerPage: 3})
 	c.NoError(err)
 	c.Len(transactions, 2)
 
@@ -173,7 +173,7 @@ func TestPostgresDriver_ReadTransactionsByFromAddress(t *testing.T) {
 	mock.ExpectQuery(".*").WillReturnError(errors.New("dummy error"))
 	mock.ExpectCommit()
 
-	transactions, err = driver.ReadTransactionsByFromAddress("1f32488b1db60fe528ab21e3cc26c96696be3faa", nil)
+	transactions, err = driver.ReadTransactionsByAddress("1f32488b1db60fe528ab21e3cc26c96696be3faa", nil)
 	c.EqualError(err, "dummy error")
 	c.Empty(transactions)
 }

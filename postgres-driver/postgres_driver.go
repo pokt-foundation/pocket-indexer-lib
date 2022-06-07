@@ -30,7 +30,7 @@ const (
 	FETCH %d FROM blocks_cursor;
 	`
 	selectTransactionsByFromAddressScript = `
-	DECLARE transactions_cursor CURSOR FOR SELECT * FROM transactions WHERE from_address = '%s' ORDER BY height DESC;
+	DECLARE transactions_cursor CURSOR FOR SELECT * FROM transactions WHERE from_address = '%s' OR to_address = '%s' ORDER BY height DESC;
 	MOVE absolute %d from transactions_cursor;
 	FETCH %d FROM transactions_cursor;
 	`
@@ -45,8 +45,8 @@ const (
 var (
 	// ErrNoPreviousHeight error when no previous height is stored
 	ErrNoPreviousHeight = errors.New("no previous height stored")
-	// ErrInvalidFromAddress error when given from address is invalid
-	ErrInvalidFromAddress = errors.New("invalid from address")
+	// ErrInvalidAddress error when given address is invalid
+	ErrInvalidAddress = errors.New("invalid address")
 )
 
 // PostgresDriver struct handler for PostgresDB related functions
@@ -91,10 +91,6 @@ func getPageValue(optionsPage int) int {
 }
 
 func getMoveValue(perPage, page int) int {
-	if page == 1 {
-		return 0
-	}
-
 	return (page - 1) * perPage
 }
 
@@ -218,17 +214,17 @@ func (d *PostgresDriver) ReadTransactions(options *ReadTransactionsOptions) ([]*
 	return indexerTransactions, nil
 }
 
-// ReadTransactionsByFromAddressOptions optional parameters for ReadTransactionsByFromAddress
-type ReadTransactionsByFromAddressOptions struct {
+// ReadTransactionsByAddressOptions optional parameters for ReadTransactionsByAddress
+type ReadTransactionsByAddressOptions struct {
 	PerPage int
 	Page    int
 }
 
-// ReadTransactionsByFromAddress returns transactions with given from address
+// ReadTransactionsByAddress returns transactions with given from address
 // Optional values defaults: page: 1, perPage: 1000
-func (d *PostgresDriver) ReadTransactionsByFromAddress(fromAddress string, options *ReadTransactionsOptions) ([]*indexer.Transaction, error) {
-	if !utils.ValidateAddress(fromAddress) {
-		return nil, ErrInvalidFromAddress
+func (d *PostgresDriver) ReadTransactionsByAddress(address string, options *ReadTransactionsOptions) ([]*indexer.Transaction, error) {
+	if !utils.ValidateAddress(address) {
+		return nil, ErrInvalidAddress
 	}
 
 	perPage := defaultPerPage
@@ -246,7 +242,7 @@ func (d *PostgresDriver) ReadTransactionsByFromAddress(fromAddress string, optio
 		return nil, err
 	}
 
-	query := fmt.Sprintf(selectTransactionsByFromAddressScript, fromAddress, move, perPage)
+	query := fmt.Sprintf(selectTransactionsByFromAddressScript, address, address, move, perPage)
 
 	var transactions []*dbTransaction
 
