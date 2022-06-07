@@ -181,7 +181,7 @@ type ReadTransactionsOptions struct {
 }
 
 // ReadTransactions returns transactions on the database with pagination
-// Optinal values defaults: page: 1, perPage: 1000
+// Optional values defaults: page: 1, perPage: 1000
 func (d *PostgresDriver) ReadTransactions(options *ReadTransactionsOptions) ([]*indexer.Transaction, error) {
 	perPage := defaultPerPage
 	page := defaultPage
@@ -232,7 +232,7 @@ func validateAddress(fromAddress string) bool {
 }
 
 // ReadTransactionsByFromAddress returns transactions with given from address
-// Optinal values defaults: page: 1, perPage: 1000
+// Optional values defaults: page: 1, perPage: 1000
 func (d *PostgresDriver) ReadTransactionsByFromAddress(fromAddress string, options *ReadTransactionsOptions) ([]*indexer.Transaction, error) {
 	if !validateAddress(fromAddress) {
 		return nil, ErrInvalidFromAddress
@@ -340,7 +340,7 @@ type ReadBlocksOptions struct {
 }
 
 // ReadBlocks returns all blocks on the database with pagination
-// Optinal values defaults: page: 1, perPage: 1000
+// Optional values defaults: page: 1, perPage: 1000
 func (d *PostgresDriver) ReadBlocks(options *ReadBlocksOptions) ([]*indexer.Block, error) {
 	perPage := defaultPerPage
 	page := defaultPage
