@@ -110,17 +110,70 @@ func TestPostgresDriver_ReadTransactions(t *testing.T) {
 		AddRow(1, "ABCD", "abcd", "dbcv", encodedTestStdTx, encodedTxResult).
 		AddRow(2, "ABFD", "abfd", "fbcv", encodedTestStdTx, encodedTxResult)
 
-	mock.ExpectQuery("^SELECT (.+) FROM transactions$").WillReturnRows(rows)
+	mock.ExpectBegin()
+	mock.ExpectQuery(".*").WillReturnRows(rows)
+	mock.ExpectCommit()
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	transactions, err := driver.ReadTransactions()
+	transactions, err := driver.ReadTransactions(&ReadTransactionsOptions{Page: 2, PerPage: 3})
 	c.NoError(err)
 	c.Len(transactions, 2)
 
-	mock.ExpectQuery("^SELECT (.+) FROM transactions$").WillReturnError(errors.New("dummy error"))
+	mock.ExpectBegin()
+	mock.ExpectQuery(".*").WillReturnError(errors.New("dummy error"))
+	mock.ExpectCommit()
 
-	transactions, err = driver.ReadTransactions()
+	transactions, err = driver.ReadTransactions(nil)
+	c.EqualError(err, "dummy error")
+	c.Empty(transactions)
+}
+
+func TestPostgresDriver_ReadTransactionsByFromAddress(t *testing.T) {
+	c := require.New(t)
+
+	db, mock, err := sqlmock.New()
+	c.NoError(err)
+
+	defer db.Close()
+
+	testStdTx := &stdTx{
+		StdTx: &provider.StdTx{},
+	}
+
+	encodedTestStdTx, err := testStdTx.Value()
+	c.NoError(err)
+
+	testTxResult := &txResult{
+		TxResult: &provider.TxResult{},
+	}
+
+	encodedTxResult, err := testTxResult.Value()
+	c.NoError(err)
+
+	rows := sqlmock.NewRows([]string{"id", "hash", "from_address", "to_address", "stdtx", "tx_result"}).
+		AddRow(1, "ABCD", "1f32488b1db60fe528ab21e3cc26c96696be3faa", "dbcv", encodedTestStdTx, encodedTxResult).
+		AddRow(2, "ABFD", "1f32488b1db60fe528ab21e3cc26c96696be3faa", "fbcv", encodedTestStdTx, encodedTxResult)
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(".*").WillReturnRows(rows)
+	mock.ExpectCommit()
+
+	driver := NewPostgresDriverFromSQLDBInstance(db)
+
+	transactions, err := driver.ReadTransactionsByFromAddress(";DROP DATABASE;", &ReadTransactionsOptions{Page: 2, PerPage: 3})
+	c.Equal(ErrInvalidFromAddress, err)
+	c.Empty(transactions)
+
+	transactions, err = driver.ReadTransactionsByFromAddress("1f32488b1db60fe528ab21e3cc26c96696be3faa", &ReadTransactionsOptions{Page: 2, PerPage: 3})
+	c.NoError(err)
+	c.Len(transactions, 2)
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(".*").WillReturnError(errors.New("dummy error"))
+	mock.ExpectCommit()
+
+	transactions, err = driver.ReadTransactionsByFromAddress("1f32488b1db60fe528ab21e3cc26c96696be3faa", nil)
 	c.EqualError(err, "dummy error")
 	c.Empty(transactions)
 }
@@ -216,17 +269,21 @@ func TestPostgresDriver_ReadBlocks(t *testing.T) {
 		AddRow(1, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21, 21).
 		AddRow(2, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21, 21)
 
-	mock.ExpectQuery("^SELECT (.+) FROM blocks$").WillReturnRows(rows)
+	mock.ExpectBegin()
+	mock.ExpectQuery(".*").WillReturnRows(rows)
+	mock.ExpectCommit()
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	blocks, err := driver.ReadBlocks()
+	blocks, err := driver.ReadBlocks(&ReadBlocksOptions{Page: 21, PerPage: 7})
 	c.NoError(err)
 	c.Len(blocks, 2)
 
-	mock.ExpectQuery("^SELECT (.+) FROM blocks$").WillReturnError(errors.New("dummy error"))
+	mock.ExpectBegin()
+	mock.ExpectQuery(".*").WillReturnError(errors.New("dummy error"))
+	mock.ExpectCommit()
 
-	blocks, err = driver.ReadBlocks()
+	blocks, err = driver.ReadBlocks(&ReadBlocksOptions{})
 	c.EqualError(err, "dummy error")
 	c.Empty(blocks)
 }

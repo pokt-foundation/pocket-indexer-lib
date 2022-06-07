@@ -3,6 +3,8 @@ package postgresdriver
 import (
 	"database/sql"
 	"errors"
+	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -17,16 +19,37 @@ const (
 	insertBlockScript = `
 	INSERT into blocks (hash, height, time, proposer_address, tx_count, relay_count)
 	VALUES (:hash, :height, :time, :proposer_address, :tx_count, :relay_count)`
-	selectAllTransactionsScript   = "SELECT * FROM transactions"
-	selectAllBlocksScript         = "SELECT * FROM blocks"
+	selectTransactionsScript = `
+	DECLARE transactions_cursor CURSOR FOR SELECT * FROM transactions ORDER BY height DESC;
+	MOVE absolute %d from transactions_cursor;
+	FETCH %d FROM transactions_cursor;
+	`
+	selectBlocksScript = `
+	DECLARE blocks_cursor CURSOR FOR SELECT * FROM blocks ORDER BY height DESC;
+	MOVE absolute %d from blocks_cursor;
+	FETCH %d FROM blocks_cursor;
+	`
+	selectTransactionsByFromAddressScript = `
+	DECLARE transactions_cursor CURSOR FOR SELECT * FROM transactions WHERE from_address = '%s' ORDER BY height DESC;
+	MOVE absolute %d from transactions_cursor;
+	FETCH %d FROM transactions_cursor;
+	`
 	selectTransactionByHashScript = "SELECT * FROM transactions WHERE hash = $1"
 	selectBlockByHashScript       = "SELECT * FROM blocks WHERE hash = $1"
 	selectMaxHeightFromBlocks     = "SELECT MAX(height) FROM blocks"
+
+	defaultPerPage = 1000
+	defaultPage    = 1
+	addressLength  = 40
 )
 
 var (
-	// ErrNoPreviousHeight error when no previos height is stored
+	// ErrNoPreviousHeight error when no previous height is stored
 	ErrNoPreviousHeight = errors.New("no previous height stored")
+	// ErrInvalidFromAddress error when given from address is invalid
+	ErrInvalidFromAddress = errors.New("invalid from address")
+
+	addressRegex = regexp.MustCompile("^[a-f0-9]+$")
 )
 
 // PostgresDriver struct handler for PostgresDB related functions
@@ -52,6 +75,30 @@ func NewPostgresDriverFromSQLDBInstance(db *sql.DB) *PostgresDriver {
 	return &PostgresDriver{
 		DB: sqlx.NewDb(db, "postgres"),
 	}
+}
+
+func getPerPageValue(optionsPerPage int) int {
+	if optionsPerPage <= 0 {
+		return defaultPerPage
+	}
+
+	return optionsPerPage
+}
+
+func getPageValue(optionsPage int) int {
+	if optionsPage <= 0 {
+		return defaultPage
+	}
+
+	return optionsPage
+}
+
+func getMoveValue(perPage, page int) int {
+	if page == 1 {
+		return 0
+	}
+
+	return (page - 1) * perPage
 }
 
 // dbTransaction is struct handler for the transaction with types needed for Postgres processing
@@ -127,12 +174,95 @@ func (d *PostgresDriver) WriteTransactions(txs []*indexer.Transaction) error {
 	return nil
 }
 
-// ReadTransactions returns all transactions on the database
-// TODO: add pagination
-func (d *PostgresDriver) ReadTransactions() ([]*indexer.Transaction, error) {
+// ReadTransactionsOptions optional parameters for ReadTransactions
+type ReadTransactionsOptions struct {
+	PerPage int
+	Page    int
+}
+
+// ReadTransactions returns transactions on the database with pagination
+// Optinal values defaults: page: 1, perPage: 1000
+func (d *PostgresDriver) ReadTransactions(options *ReadTransactionsOptions) ([]*indexer.Transaction, error) {
+	perPage := defaultPerPage
+	page := defaultPage
+
+	if options != nil {
+		perPage = getPerPageValue(options.PerPage)
+		page = getPageValue(options.Page)
+	}
+
+	move := getMoveValue(perPage, page)
+
+	tx, err := d.Beginx()
+	if err != nil {
+		return nil, err
+	}
+
+	query := fmt.Sprintf(selectTransactionsScript, move, perPage)
+
 	var transactions []*dbTransaction
 
-	err := d.Select(&transactions, selectAllTransactionsScript)
+	err = tx.Select(&transactions, query)
+	if err != nil {
+		return nil, err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return nil, err
+	}
+
+	var indexerTransactions []*indexer.Transaction
+
+	for _, dbTransaction := range transactions {
+		indexerTransactions = append(indexerTransactions, dbTransaction.toIndexerTransaction())
+	}
+
+	return indexerTransactions, nil
+}
+
+// ReadTransactionsByFromAddressOptions optional parameters for ReadTransactionsByFromAddress
+type ReadTransactionsByFromAddressOptions struct {
+	PerPage int
+	Page    int
+}
+
+func validateAddress(fromAddress string) bool {
+	return addressRegex.MatchString(fromAddress) && len(fromAddress) == addressLength
+}
+
+// ReadTransactionsByFromAddress returns transactions with given from address
+// Optinal values defaults: page: 1, perPage: 1000
+func (d *PostgresDriver) ReadTransactionsByFromAddress(fromAddress string, options *ReadTransactionsOptions) ([]*indexer.Transaction, error) {
+	if !validateAddress(fromAddress) {
+		return nil, ErrInvalidFromAddress
+	}
+
+	perPage := defaultPerPage
+	page := defaultPage
+
+	if options != nil {
+		perPage = getPerPageValue(options.PerPage)
+		page = getPageValue(options.Page)
+	}
+
+	move := getMoveValue(perPage, page)
+
+	tx, err := d.Beginx()
+	if err != nil {
+		return nil, err
+	}
+
+	query := fmt.Sprintf(selectTransactionsByFromAddressScript, fromAddress, move, perPage)
+
+	var transactions []*dbTransaction
+
+	err = tx.Select(&transactions, query)
+	if err != nil {
+		return nil, err
+	}
+
+	err = tx.Commit()
 	if err != nil {
 		return nil, err
 	}
@@ -203,12 +333,40 @@ func (d *PostgresDriver) WriteBlock(block *indexer.Block) error {
 	return nil
 }
 
-// ReadBlocks returns all blocks on the database
-// TODO: add pagination
-func (d *PostgresDriver) ReadBlocks() ([]*indexer.Block, error) {
+// ReadBlocksOptions optional parameters for ReadBlocks
+type ReadBlocksOptions struct {
+	PerPage int
+	Page    int
+}
+
+// ReadBlocks returns all blocks on the database with pagination
+// Optinal values defaults: page: 1, perPage: 1000
+func (d *PostgresDriver) ReadBlocks(options *ReadBlocksOptions) ([]*indexer.Block, error) {
+	perPage := defaultPerPage
+	page := defaultPage
+
+	if options != nil {
+		perPage = getPerPageValue(options.PerPage)
+		page = getPageValue(options.Page)
+	}
+
+	move := getMoveValue(perPage, page)
+
+	tx, err := d.Beginx()
+	if err != nil {
+		return nil, err
+	}
+
+	query := fmt.Sprintf(selectBlocksScript, move, perPage)
+
 	var blocks []*dbBlock
 
-	err := d.Select(&blocks, selectAllBlocksScript)
+	err = tx.Select(&blocks, query)
+	if err != nil {
+		return nil, err
+	}
+
+	err = tx.Commit()
 	if err != nil {
 		return nil, err
 	}
