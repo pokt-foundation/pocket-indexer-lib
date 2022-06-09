@@ -238,7 +238,6 @@ func TestPostgresDriver_WriteBlock(t *testing.T) {
 		Time:            time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local),
 		ProposerAddress: "A2143929B30CBC3E7A30C2DE06B385BCF874134B",
 		TXCount:         32,
-		RelayCount:      21,
 	})
 	c.NoError(err)
 
@@ -252,7 +251,6 @@ func TestPostgresDriver_WriteBlock(t *testing.T) {
 		Time:            time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local),
 		ProposerAddress: "A2143929B30CBC3E7A30C2DE06B385BCF874134B",
 		TXCount:         32,
-		RelayCount:      21,
 	})
 	c.EqualError(err, "dummy error")
 }
@@ -265,9 +263,9 @@ func TestPostgresDriver_ReadBlocks(t *testing.T) {
 
 	defer db.Close()
 
-	rows := sqlmock.NewRows([]string{"id", "hash", "height", "time", "proposer_address", "tx_count", "relay_count"}).
-		AddRow(1, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21, 21).
-		AddRow(2, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21, 21)
+	rows := sqlmock.NewRows([]string{"id", "hash", "height", "time", "proposer_address", "tx_count"}).
+		AddRow(1, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21).
+		AddRow(2, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21)
 
 	mock.ExpectBegin()
 	mock.ExpectQuery(".*").WillReturnRows(rows)
@@ -296,8 +294,8 @@ func TestPostgresDriver_ReadBlock(t *testing.T) {
 
 	defer db.Close()
 
-	rows := sqlmock.NewRows([]string{"id", "hash", "height", "time", "proposer_address", "tx_count", "relay_count"}).
-		AddRow(1, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21, 21)
+	rows := sqlmock.NewRows([]string{"id", "hash", "height", "time", "proposer_address", "tx_count"}).
+		AddRow(1, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21)
 
 	mock.ExpectQuery("^SELECT (.+) FROM blocks (.+)").WillReturnRows(rows)
 
