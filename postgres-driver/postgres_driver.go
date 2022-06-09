@@ -17,8 +17,8 @@ const (
 	INSERT into transactions (hash, from_address, to_address, app_pub_key, blockchains, message_type, height, index, stdtx, tx_result, tx, entropy, fee, fee_denomination)
 	VALUES (:hash, :from_address, :to_address, :app_pub_key, :blockchains, :message_type, :height, :index, :stdtx, :tx_result, :tx, :entropy, :fee, :fee_denomination)`
 	insertBlockScript = `
-	INSERT into blocks (hash, height, time, proposer_address, tx_count, relay_count)
-	VALUES (:hash, :height, :time, :proposer_address, :tx_count, :relay_count)`
+	INSERT into blocks (hash, height, time, proposer_address, tx_count)
+	VALUES (:hash, :height, :time, :proposer_address, :tx_count)`
 	selectTransactionsScript = `
 	DECLARE transactions_cursor CURSOR FOR SELECT * FROM transactions ORDER BY height DESC;
 	MOVE absolute %d from transactions_cursor;
@@ -285,7 +285,6 @@ type dbBlock struct {
 	Time            time.Time `db:"time"`
 	ProposerAddress string    `db:"proposer_address"`
 	TXCount         int       `db:"tx_count"`
-	RelayCount      int       `db:"relay_count"`
 }
 
 func (b *dbBlock) toIndexerBlock() *indexer.Block {
@@ -295,7 +294,6 @@ func (b *dbBlock) toIndexerBlock() *indexer.Block {
 		Time:            b.Time,
 		ProposerAddress: b.ProposerAddress,
 		TXCount:         b.TXCount,
-		RelayCount:      b.RelayCount,
 	}
 }
 
@@ -306,7 +304,6 @@ func convertIndexerBlockToDBBlock(indexerBlock *indexer.Block) *dbBlock {
 		Time:            indexerBlock.Time,
 		ProposerAddress: indexerBlock.ProposerAddress,
 		TXCount:         indexerBlock.TXCount,
-		RelayCount:      indexerBlock.RelayCount,
 	}
 }
 

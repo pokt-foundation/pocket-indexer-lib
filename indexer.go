@@ -155,7 +155,6 @@ type Block struct {
 	Time            time.Time
 	ProposerAddress string
 	TXCount         int
-	RelayCount      int
 }
 
 // IndexBlock converts block details to a known structure and saves them
@@ -189,6 +188,5 @@ func convertProviderBlockToBlock(providerBlock *provider.GetBlockOutput) *Block 
 		Time:            blockHeader.Time,
 		ProposerAddress: blockHeader.ProposerAddress,
 		TXCount:         totalTxs,
-		RelayCount:      0, // TODO: add correct RelayCount
 	}
 }
