@@ -109,25 +109,11 @@ func convertProviderTransactionToTransaction(providerTransaction *provider.Trans
 
 // IndexBlockTransactions converts block transactions to a known structure and saves them
 func (i *Indexer) IndexBlockTransactions(blockHeight int) error {
-	currentPage := 1
-	var providerTxs []*provider.Transaction
 
-	for {
-		blockTransactionsOutput, err := i.provider.GetBlockTransactions(blockHeight, &provider.GetBlockTransactionsOptions{
-			Page:    currentPage,
-			PerPage: 10000,
-		})
-		if err != nil {
-			return err
-		}
+	providerTxs, err := getProviderBlockTransactions(blockHeight, i.provider)
 
-		if blockTransactionsOutput.PageCount == 0 {
-			break
-		}
-
-		providerTxs = append(providerTxs, blockTransactionsOutput.Txs...)
-
-		currentPage++
+	if err != nil {
+		return err
 	}
 
 	if len(providerTxs) == 0 {
@@ -140,7 +126,8 @@ func (i *Indexer) IndexBlockTransactions(blockHeight int) error {
 		transactions = append(transactions, convertProviderTransactionToTransaction(tx))
 	}
 
-	err := i.writer.WriteTransactions(transactions)
+	err = i.writer.WriteTransactions(transactions)
+
 	if err != nil {
 		return err
 	}
@@ -169,7 +156,24 @@ func (i *Indexer) IndexBlock(blockHeight int) error {
 		return ErrBlockHasNoHash
 	}
 
-	err = i.writer.WriteBlock(convertProviderBlockToBlock(blockOutput))
+	blockTxs, err := getProviderBlockTransactions(blockHeight, i.provider)
+
+	if err != nil {
+		return err
+	}
+
+	relayCount := 0
+
+	for _, tx := range blockTxs {
+		if tx.TxResult.MessageType == "claim" {
+			proofs := tx.StdTx.Msg.Value["total_proofs"].(int)
+			relayCount += proofs
+		}
+	}
+
+	block := convertProviderBlockToBlock(blockOutput, relayCount)
+
+	err = i.writer.WriteBlock(block)
 	if err != nil {
 		return err
 	}
@@ -177,7 +181,32 @@ func (i *Indexer) IndexBlock(blockHeight int) error {
 	return nil
 }
 
-func convertProviderBlockToBlock(providerBlock *provider.GetBlockOutput) *Block {
+func getProviderBlockTransactions(blockHeight int, indexerProvider Provider) ([]*provider.Transaction, error) {
+	currentPage := 1
+	var providerTxs []*provider.Transaction
+
+	for {
+		blockTransactionsOutput, err := indexerProvider.GetBlockTransactions(blockHeight, &provider.GetBlockTransactionsOptions{
+			Page:    currentPage,
+			PerPage: 10000,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		if blockTransactionsOutput.PageCount == 0 {
+			break
+		}
+
+		providerTxs = append(providerTxs, blockTransactionsOutput.Txs...)
+
+		currentPage++
+	}
+
+	return providerTxs, nil
+}
+
+func convertProviderBlockToBlock(providerBlock *provider.GetBlockOutput, relayCount int) *Block {
 	blockHeader := providerBlock.Block.Header
 
 	height, _ := strconv.Atoi(blockHeader.Height)
@@ -189,6 +218,6 @@ func convertProviderBlockToBlock(providerBlock *provider.GetBlockOutput) *Block 
 		Time:            blockHeader.Time,
 		ProposerAddress: blockHeader.ProposerAddress,
 		TXCount:         totalTxs,
-		RelayCount:      0, // TODO: add correct RelayCount
+		RelayCount:      relayCount,
 	}
 }

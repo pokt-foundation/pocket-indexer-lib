@@ -99,6 +99,14 @@ func TestIndexer_IndexBlock(t *testing.T) {
 	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryBlockRoute),
 		http.StatusOK, "samples/query_block.json")
 
+	mock.AddMultipleMockedResponses(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryBlockTXsRoute),
+		http.StatusOK, []string{
+			"samples/query_block_txs.json",
+			"samples/query_block_txs_empty.json",
+			"samples/query_block_txs.json",
+			"samples/query_block_txs_empty.json",
+		})
+
 	writerMock.On("WriteBlock", testMock.Anything).Return(errors.New("forced failure")).Once()
 
 	err = indexer.IndexBlock(30363)
