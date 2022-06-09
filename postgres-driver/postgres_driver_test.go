@@ -32,7 +32,6 @@ func TestPostgresDriver_WriteTransactions(t *testing.T) {
 			Type: "pos/Send",
 			Value: map[string]any{
 				"from_address": "addssd",
-				"to_address":   "adasd",
 				"chains": []any{
 					"0021",
 				},
@@ -51,7 +50,7 @@ func TestPostgresDriver_WriteTransactions(t *testing.T) {
 	c.NoError(err)
 
 	mock.ExpectExec("INSERT into transactions").WithArgs("AF5BB3EAFF431E2E5E784D639825979FF20A779725BFE61D4521340F70C3996D0",
-		"addssd", "adasd", "adasdsfd", pq.StringArray([]string{"0021"}), "pos/Send", int64(0), int64(0), encodedTestStdTx,
+		"addssd", nil, "adasdsfd", pq.StringArray([]string{"0021"}), "pos/Send", int64(0), int64(0), encodedTestStdTx,
 		[]uint8{123, 125}, "", int64(3223323), int64(10000), "upokt").
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
@@ -61,7 +60,7 @@ func TestPostgresDriver_WriteTransactions(t *testing.T) {
 		{
 			Hash:            "AF5BB3EAFF431E2E5E784D639825979FF20A779725BFE61D4521340F70C3996D0",
 			FromAddress:     "addssd",
-			ToAddress:       "adasd",
+			ToAddress:       "",
 			AppPubKey:       "adasdsfd",
 			Blockchains:     []string{"0021"},
 			MessageType:     "pos/Send",
@@ -76,7 +75,7 @@ func TestPostgresDriver_WriteTransactions(t *testing.T) {
 	c.NoError(err)
 
 	mock.ExpectExec("INSERT into transactions").WithArgs("AF5BB3EAFF431E2E5E784D639825979FF20A779725BFE61D4521340F70C3996D0",
-		"addssd", "adasd", "adasdsfd", pq.StringArray([]string{"0021"}), "pos/Send", int64(0), int64(0), encodedTestStdTx,
+		"addssd", nil, "adasdsfd", pq.StringArray([]string{"0021"}), "pos/Send", int64(0), int64(0), encodedTestStdTx,
 		[]uint8{123, 125}, "", int64(3223323), int64(10000), "upokt").
 		WillReturnError(errors.New("dummy error"))
 

@@ -98,8 +98,8 @@ func getMoveValue(perPage, page int) int {
 type dbTransaction struct {
 	ID              int            `db:"id"`
 	Hash            string         `db:"hash"`
-	FromAddress     string         `db:"from_address"`
-	ToAddress       string         `db:"to_address"`
+	FromAddress     sql.NullString `db:"from_address"`
+	ToAddress       sql.NullString `db:"to_address"`
 	AppPubKey       string         `db:"app_pub_key"`
 	Blockchains     pq.StringArray `db:"blockchains"`
 	MessageType     string         `db:"message_type"`
@@ -116,8 +116,8 @@ type dbTransaction struct {
 func (t *dbTransaction) toIndexerTransaction() *indexer.Transaction {
 	return &indexer.Transaction{
 		Hash:            t.Hash,
-		FromAddress:     t.FromAddress,
-		ToAddress:       t.ToAddress,
+		FromAddress:     t.FromAddress.String,
+		ToAddress:       t.ToAddress.String,
 		AppPubKey:       t.AppPubKey,
 		Blockchains:     t.Blockchains,
 		MessageType:     t.MessageType,
@@ -132,11 +132,22 @@ func (t *dbTransaction) toIndexerTransaction() *indexer.Transaction {
 	}
 }
 
+func newSQLNullString(value string) sql.NullString {
+	if value == "" {
+		return sql.NullString{}
+	}
+
+	return sql.NullString{
+		String: value,
+		Valid:  true,
+	}
+}
+
 func convertIndexerTransactionToDBTransaction(indexerTransaction *indexer.Transaction) *dbTransaction {
 	return &dbTransaction{
 		Hash:            indexerTransaction.Hash,
-		FromAddress:     indexerTransaction.FromAddress,
-		ToAddress:       indexerTransaction.ToAddress,
+		FromAddress:     newSQLNullString(indexerTransaction.FromAddress),
+		ToAddress:       newSQLNullString(indexerTransaction.ToAddress),
 		AppPubKey:       indexerTransaction.AppPubKey,
 		Blockchains:     indexerTransaction.Blockchains,
 		MessageType:     indexerTransaction.MessageType,
