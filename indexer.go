@@ -57,10 +57,12 @@ type Transaction struct {
 	Entropy         int
 	Fee             int
 	FeeDenomination string
+	Amount          int
 }
 
 func convertProviderTransactionToTransaction(providerTransaction *provider.Transaction) *Transaction {
 	var fromAddress, toAddress string
+	var amount int
 	var blockChains []string
 
 	stdTx := providerTransaction.StdTx
@@ -75,6 +77,11 @@ func convertProviderTransactionToTransaction(providerTransaction *provider.Trans
 	rawToAddress, ok := msgValues["to_address"].(string)
 	if ok {
 		toAddress = rawToAddress
+	}
+
+	rawAmount, ok := msgValues["amount"].(string)
+	if ok {
+		amount, _ = strconv.Atoi(rawAmount)
 	}
 
 	rawBlockChains, ok := msgValues["chains"].([]any)
@@ -104,6 +111,7 @@ func convertProviderTransactionToTransaction(providerTransaction *provider.Trans
 		Entropy:         int(stdTx.Entropy),
 		Fee:             fee,
 		FeeDenomination: feeStruct.Denom,
+		Amount:          amount,
 	}
 }
 
