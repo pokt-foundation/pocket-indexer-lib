@@ -18,7 +18,7 @@ var (
 // Provider interface of needed provider functions
 type Provider interface {
 	GetBlock(blockNumber int) (*provider.GetBlockOutput, error)
-	GetBlockTransactions(blockHeight int, options *provider.GetBlockTransactionsOptions) (*provider.GetBlockTransactionsOutput, error)
+	GetBlockTransactions(options *provider.GetBlockTransactionsOptions) (*provider.GetBlockTransactionsOutput, error)
 }
 
 // Writer interface for write methods to index
@@ -121,7 +121,8 @@ func (i *Indexer) IndexBlockTransactions(blockHeight int) error {
 	var providerTxs []*provider.Transaction
 
 	for {
-		blockTransactionsOutput, err := i.provider.GetBlockTransactions(blockHeight, &provider.GetBlockTransactionsOptions{
+		blockTransactionsOutput, err := i.provider.GetBlockTransactions(&provider.GetBlockTransactionsOptions{
+			Height:  blockHeight,
 			Page:    currentPage,
 			PerPage: 10000,
 		})
