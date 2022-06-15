@@ -14,8 +14,8 @@ import (
 
 const (
 	insertTransactionsScript = `
-	INSERT into transactions (hash, from_address, to_address, app_pub_key, blockchains, message_type, height, index, stdtx, tx_result, tx, entropy, fee, fee_denomination)
-	VALUES (:hash, :from_address, :to_address, :app_pub_key, :blockchains, :message_type, :height, :index, :stdtx, :tx_result, :tx, :entropy, :fee, :fee_denomination)`
+	INSERT into transactions (hash, from_address, to_address, app_pub_key, blockchains, message_type, height, index, stdtx, tx_result, tx, entropy, fee, fee_denomination, amount)
+	VALUES (:hash, :from_address, :to_address, :app_pub_key, :blockchains, :message_type, :height, :index, :stdtx, :tx_result, :tx, :entropy, :fee, :fee_denomination, :amount)`
 	insertBlockScript = `
 	INSERT into blocks (hash, height, time, proposer_address, tx_count)
 	VALUES (:hash, :height, :time, :proposer_address, :tx_count)`
@@ -29,14 +29,24 @@ const (
 	MOVE absolute %d from blocks_cursor;
 	FETCH %d FROM blocks_cursor;
 	`
-	selectTransactionsByFromAddressScript = `
+	selectTransactionsByAddressScript = `
 	DECLARE transactions_cursor CURSOR FOR SELECT * FROM transactions WHERE from_address = '%s' OR to_address = '%s' ORDER BY height DESC;
 	MOVE absolute %d from transactions_cursor;
 	FETCH %d FROM transactions_cursor;
 	`
-	selectTransactionByHashScript = "SELECT * FROM transactions WHERE hash = $1"
-	selectBlockByHashScript       = "SELECT * FROM blocks WHERE hash = $1"
-	selectMaxHeightFromBlocks     = "SELECT MAX(height) FROM blocks"
+	selectTransactionByHashScript    = "SELECT * FROM transactions WHERE hash = $1"
+	selectBlockByHashScript          = "SELECT * FROM blocks WHERE hash = $1"
+	selectTransactionsByHeightScript = `
+	DECLARE transactions_cursor CURSOR FOR SELECT * FROM transactions WHERE height = '%d';
+	MOVE absolute %d from transactions_cursor;
+	FETCH %d FROM transactions_cursor;
+	`
+	selectBlockByHeightScript            = "SELECT * FROM blocks WHERE height = $1"
+	selectCountFromTransactions          = "SELECT COUNT(*) FROM transactions"
+	selectCountFromBlocks                = "SELECT COUNT(*) FROM blocks"
+	selectCountFromTransactionsByAddress = "SELECT COUNT(*) FROM transactions WHERE from_address = $1 OR to_address = $1"
+	selectCountFromTransactionsByHeight  = "SELECT COUNT(*) FROM transactions WHERE height = $1"
+	selectMaxHeightFromBlocks            = "SELECT MAX(height) FROM blocks"
 
 	defaultPerPage = 1000
 	defaultPage    = 1
@@ -111,6 +121,7 @@ type dbTransaction struct {
 	Entropy         int            `db:"entropy"`
 	Fee             int            `db:"fee"`
 	FeeDenomination string         `db:"fee_denomination"`
+	Amount          int            `db:"amount"`
 }
 
 func (t *dbTransaction) toIndexerTransaction() *indexer.Transaction {
@@ -129,6 +140,7 @@ func (t *dbTransaction) toIndexerTransaction() *indexer.Transaction {
 		Entropy:         t.Entropy,
 		Fee:             t.Fee,
 		FeeDenomination: t.FeeDenomination,
+		Amount:          t.Amount,
 	}
 }
 
@@ -159,6 +171,7 @@ func convertIndexerTransactionToDBTransaction(indexerTransaction *indexer.Transa
 		Entropy:         indexerTransaction.Entropy,
 		Fee:             indexerTransaction.Fee,
 		FeeDenomination: indexerTransaction.FeeDenomination,
+		Amount:          indexerTransaction.Amount,
 	}
 }
 
@@ -253,7 +266,7 @@ func (d *PostgresDriver) ReadTransactionsByAddress(address string, options *Read
 		return nil, err
 	}
 
-	query := fmt.Sprintf(selectTransactionsByFromAddressScript, address, address, move, perPage)
+	query := fmt.Sprintf(selectTransactionsByAddressScript, address, address, move, perPage)
 
 	var transactions []*dbTransaction
 
@@ -276,8 +289,55 @@ func (d *PostgresDriver) ReadTransactionsByAddress(address string, options *Read
 	return indexerTransactions, nil
 }
 
-// ReadTransaction returns transaction in the database with given transaction hash
-func (d *PostgresDriver) ReadTransaction(hash string) (*indexer.Transaction, error) {
+// ReadTransactionsByHeightOptions optional parameters for ReadTransactionsByHeight
+type ReadTransactionsByHeightOptions struct {
+	PerPage int
+	Page    int
+}
+
+// ReadTransactionsByHeight returns transactions with given height
+// Optional values defaults: page: 1, perPage: 1000
+func (d *PostgresDriver) ReadTransactionsByHeight(height int, options *ReadTransactionsByHeightOptions) ([]*indexer.Transaction, error) {
+	perPage := defaultPerPage
+	page := defaultPage
+
+	if options != nil {
+		perPage = getPerPageValue(options.PerPage)
+		page = getPageValue(options.Page)
+	}
+
+	move := getMoveValue(perPage, page)
+
+	tx, err := d.Beginx()
+	if err != nil {
+		return nil, err
+	}
+
+	query := fmt.Sprintf(selectTransactionsByHeightScript, height, move, perPage)
+
+	var transactions []*dbTransaction
+
+	err = tx.Select(&transactions, query)
+	if err != nil {
+		return nil, err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return nil, err
+	}
+
+	var indexerTransactions []*indexer.Transaction
+
+	for _, dbTransaction := range transactions {
+		indexerTransactions = append(indexerTransactions, dbTransaction.toIndexerTransaction())
+	}
+
+	return indexerTransactions, nil
+}
+
+// ReadTransactionByHash returns transaction in the database with given transaction hash
+func (d *PostgresDriver) ReadTransactionByHash(hash string) (*indexer.Transaction, error) {
 	var dbTransaction dbTransaction
 
 	err := d.Get(&dbTransaction, selectTransactionByHashScript, hash)
@@ -286,6 +346,52 @@ func (d *PostgresDriver) ReadTransaction(hash string) (*indexer.Transaction, err
 	}
 
 	return dbTransaction.toIndexerTransaction(), nil
+}
+
+// GetTransactionsQuantity returns quantity of transactions saved
+func (d *PostgresDriver) GetTransactionsQuantity() (int64, error) {
+	row := d.QueryRow(selectCountFromTransactions)
+
+	var quantity int64
+
+	err := row.Scan(&quantity)
+	if err != nil {
+		return 0, err
+	}
+
+	return quantity, nil
+}
+
+// GetTransactionsQuantityByAddress returns quantity of transactions with given address saved
+func (d *PostgresDriver) GetTransactionsQuantityByAddress(address string) (int64, error) {
+	if !utils.ValidateAddress(address) {
+		return 0, ErrInvalidAddress
+	}
+
+	row := d.QueryRow(selectCountFromTransactionsByAddress, address)
+
+	var quantity int64
+
+	err := row.Scan(&quantity)
+	if err != nil {
+		return 0, err
+	}
+
+	return quantity, nil
+}
+
+// GetTransactionsQuantityByHeight returns quantity of transactions with given height saved
+func (d *PostgresDriver) GetTransactionsQuantityByHeight(height int) (int64, error) {
+	row := d.QueryRow(selectCountFromTransactionsByHeight, height)
+
+	var quantity int64
+
+	err := row.Scan(&quantity)
+	if err != nil {
+		return 0, err
+	}
+
+	return quantity, nil
 }
 
 // dbBlock is struct handler for the block with types needed for Postgres processing
@@ -377,11 +483,23 @@ func (d *PostgresDriver) ReadBlocks(options *ReadBlocksOptions) ([]*indexer.Bloc
 	return indexerBlocks, nil
 }
 
-// ReadBlock returns block in the database with given block hash
-func (d *PostgresDriver) ReadBlock(hash string) (*indexer.Block, error) {
+// ReadBlockByHash returns block in the database with given block hash
+func (d *PostgresDriver) ReadBlockByHash(hash string) (*indexer.Block, error) {
 	var dbBlock dbBlock
 
 	err := d.Get(&dbBlock, selectBlockByHashScript, hash)
+	if err != nil {
+		return nil, err
+	}
+
+	return dbBlock.toIndexerBlock(), nil
+}
+
+// ReadBlockByHeight returns block in the database with given height
+func (d *PostgresDriver) ReadBlockByHeight(height int) (*indexer.Block, error) {
+	var dbBlock dbBlock
+
+	err := d.Get(&dbBlock, selectBlockByHeightScript, height)
 	if err != nil {
 		return nil, err
 	}
@@ -405,4 +523,18 @@ func (d *PostgresDriver) GetMaxHeightInBlocks() (int64, error) {
 	}
 
 	return maxHeight.Int64, nil
+}
+
+// GetBlocksQuantity returns quantity of blocks saved
+func (d *PostgresDriver) GetBlocksQuantity() (int64, error) {
+	row := d.QueryRow(selectCountFromBlocks)
+
+	var quantity int64
+
+	err := row.Scan(&quantity)
+	if err != nil {
+		return 0, err
+	}
+
+	return quantity, nil
 }

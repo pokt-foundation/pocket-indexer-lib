@@ -41,6 +41,7 @@
             "value": {
               "to_address": "ABCD",
               "from_address": "CDSA",
+              "amount": "462000000",
               "chains": [
                 "0021"
               ]
