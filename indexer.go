@@ -204,6 +204,7 @@ func convertProviderBlockToBlock(providerBlock *provider.GetBlockOutput) *Block 
 // Account struct handler of all account fields to be indexed
 type Account struct {
 	Address             string
+	Height              int
 	Balance             *big.Int
 	BalanceDenomination string
 }
@@ -215,10 +216,10 @@ func (i *Indexer) IndexAccount(address string, blockHeight int) error {
 		return err
 	}
 
-	return i.writer.WriteAccount(convertProviderAccountToAccount(accountOutput))
+	return i.writer.WriteAccount(convertProviderAccountToAccount(blockHeight, accountOutput))
 }
 
-func convertProviderAccountToAccount(providerAccount *provider.GetAccountOutput) *Account {
+func convertProviderAccountToAccount(height int, providerAccount *provider.GetAccountOutput) *Account {
 	coins := providerAccount.Coins[0]
 
 	balance := new(big.Int)
@@ -226,6 +227,7 @@ func convertProviderAccountToAccount(providerAccount *provider.GetAccountOutput)
 
 	return &Account{
 		Address:             providerAccount.Address,
+		Height:              height,
 		Balance:             balance,
 		BalanceDenomination: coins.Denom,
 	}
@@ -234,6 +236,7 @@ func convertProviderAccountToAccount(providerAccount *provider.GetAccountOutput)
 // Node struct handler of all node fields to be indexed
 type Node struct {
 	Address    string
+	Height     int
 	Jailed     bool
 	PublicKey  string
 	ServiceURL string
@@ -269,18 +272,19 @@ func (i *Indexer) IndexNodes(blockHeight int) error {
 	var nodes []*Node
 
 	for _, node := range providerNodes {
-		nodes = append(nodes, convertProviderNodeToNode(node))
+		nodes = append(nodes, convertProviderNodeToNode(blockHeight, node))
 	}
 
 	return i.writer.WriteNodes(nodes)
 }
 
-func convertProviderNodeToNode(provNode *provider.Node) *Node {
+func convertProviderNodeToNode(height int, provNode *provider.Node) *Node {
 	tokens := new(big.Int)
 	tokens, _ = tokens.SetString(provNode.Tokens, 10)
 
 	return &Node{
 		Address:    provNode.Address,
+		Height:     height,
 		Jailed:     provNode.Jailed,
 		PublicKey:  provNode.PublicKey,
 		ServiceURL: provNode.ServiceURL,
@@ -291,6 +295,7 @@ func convertProviderNodeToNode(provNode *provider.Node) *Node {
 // App struct handler of all app fields to be indexed
 type App struct {
 	Address      string
+	Height       int
 	Jailed       bool
 	PublicKey    string
 	StakedTokens *big.Int
@@ -325,18 +330,19 @@ func (i *Indexer) IndexApps(blockHeight int) error {
 	var apps []*App
 
 	for _, app := range providerApps {
-		apps = append(apps, convertProviderAppToApp(app))
+		apps = append(apps, convertProviderAppToApp(blockHeight, app))
 	}
 
 	return i.writer.WriteApps(apps)
 }
 
-func convertProviderAppToApp(provApp *provider.App) *App {
+func convertProviderAppToApp(height int, provApp *provider.App) *App {
 	stakedTokens := new(big.Int)
 	stakedTokens, _ = stakedTokens.SetString(provApp.StakedTokens, 10)
 
 	return &App{
 		Address:      provApp.Address,
+		Height:       height,
 		Jailed:       provApp.Jailed,
 		PublicKey:    provApp.PublicKey,
 		StakedTokens: stakedTokens,
