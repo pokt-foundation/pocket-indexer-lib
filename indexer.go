@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"errors"
+	"math/big"
 	"strconv"
 	"time"
 
@@ -11,6 +12,10 @@ import (
 var (
 	// ErrNoTransactionsToIndex error when there are no transactions to index
 	ErrNoTransactionsToIndex = errors.New("no transactions to index")
+	// ErrNoNodesToIndex error when there are no nodes to index
+	ErrNoNodesToIndex = errors.New("no nodes to index")
+	// ErrNoAppsToIndex error when there are no apps to index
+	ErrNoAppsToIndex = errors.New("no apps to index")
 	// ErrBlockHasNoHash error when block hash no hash
 	ErrBlockHasNoHash = errors.New("block to index has no hash")
 )
@@ -19,12 +24,18 @@ var (
 type Provider interface {
 	GetBlock(blockNumber int) (*provider.GetBlockOutput, error)
 	GetBlockTransactions(options *provider.GetBlockTransactionsOptions) (*provider.GetBlockTransactionsOutput, error)
+	GetAccount(address string, options *provider.GetAccountOptions) (*provider.GetAccountOutput, error)
+	GetNodes(options *provider.GetNodesOptions) (*provider.GetNodesOutput, error)
+	GetApps(options *provider.GetAppsOptions) (*provider.GetAppsOutput, error)
 }
 
 // Writer interface for write methods to index
 type Writer interface {
 	WriteBlock(block *Block) error
 	WriteTransactions(txs []*Transaction) error
+	WriteAccount(account *Account) error
+	WriteNodes(nodes []*Node) error
+	WriteApps(apps []*App) error
 }
 
 // Indexer struct handler for Indexer functions
@@ -149,12 +160,7 @@ func (i *Indexer) IndexBlockTransactions(blockHeight int) error {
 		transactions = append(transactions, convertProviderTransactionToTransaction(tx))
 	}
 
-	err := i.writer.WriteTransactions(transactions)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return i.writer.WriteTransactions(transactions)
 }
 
 // Block struct handler of all block fields to be indexed
@@ -177,12 +183,7 @@ func (i *Indexer) IndexBlock(blockHeight int) error {
 		return ErrBlockHasNoHash
 	}
 
-	err = i.writer.WriteBlock(convertProviderBlockToBlock(blockOutput))
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return i.writer.WriteBlock(convertProviderBlockToBlock(blockOutput))
 }
 
 func convertProviderBlockToBlock(providerBlock *provider.GetBlockOutput) *Block {
@@ -197,5 +198,147 @@ func convertProviderBlockToBlock(providerBlock *provider.GetBlockOutput) *Block 
 		Time:            blockHeader.Time,
 		ProposerAddress: blockHeader.ProposerAddress,
 		TXCount:         totalTxs,
+	}
+}
+
+// Account struct handler of all account fields to be indexed
+type Account struct {
+	Address             string
+	Balance             *big.Int
+	BalanceDenomination string
+}
+
+// IndexAccount converts account details to a known structure and saves them
+func (i *Indexer) IndexAccount(address string, blockHeight int) error {
+	accountOutput, err := i.provider.GetAccount(address, &provider.GetAccountOptions{Height: blockHeight})
+	if err != nil {
+		return err
+	}
+
+	return i.writer.WriteAccount(convertProviderAccountToAccount(accountOutput))
+}
+
+func convertProviderAccountToAccount(providerAccount *provider.GetAccountOutput) *Account {
+	coins := providerAccount.Coins[0]
+
+	balance := new(big.Int)
+	balance, _ = balance.SetString(coins.Amount, 10)
+
+	return &Account{
+		Address:             providerAccount.Address,
+		Balance:             balance,
+		BalanceDenomination: coins.Denom,
+	}
+}
+
+// Node struct handler of all node fields to be indexed
+type Node struct {
+	Address    string
+	Jailed     bool
+	PublicKey  string
+	ServiceURL string
+	Tokens     *big.Int
+}
+
+// IndexNodes converts nodes details to known structures and saves them
+func (i *Indexer) IndexNodes(blockHeight int) error {
+	totalPages := 1
+	var providerNodes []*provider.Node
+
+	for page := 1; page <= totalPages; page++ {
+		nodesOutput, err := i.provider.GetNodes(&provider.GetNodesOptions{
+			Height:  blockHeight,
+			Page:    page,
+			PerPage: 10000,
+		})
+		if err != nil {
+			return err
+		}
+
+		if page == 1 {
+			totalPages = nodesOutput.TotalPages
+		}
+
+		providerNodes = append(providerNodes, nodesOutput.Result...)
+	}
+
+	if len(providerNodes) == 0 {
+		return ErrNoNodesToIndex
+	}
+
+	var nodes []*Node
+
+	for _, node := range providerNodes {
+		nodes = append(nodes, convertProviderNodeToNode(node))
+	}
+
+	return i.writer.WriteNodes(nodes)
+}
+
+func convertProviderNodeToNode(provNode *provider.Node) *Node {
+	tokens := new(big.Int)
+	tokens, _ = tokens.SetString(provNode.Tokens, 10)
+
+	return &Node{
+		Address:    provNode.Address,
+		Jailed:     provNode.Jailed,
+		PublicKey:  provNode.PublicKey,
+		ServiceURL: provNode.ServiceURL,
+		Tokens:     tokens,
+	}
+}
+
+// App struct handler of all app fields to be indexed
+type App struct {
+	Address      string
+	Jailed       bool
+	PublicKey    string
+	StakedTokens *big.Int
+}
+
+// IndexApps converts apps details to known structures and saved them
+func (i *Indexer) IndexApps(blockHeight int) error {
+	totalPages := 1
+	var providerApps []*provider.App
+
+	for page := 1; page <= totalPages; page++ {
+		appsOutput, err := i.provider.GetApps(&provider.GetAppsOptions{
+			Height:  blockHeight,
+			Page:    page,
+			PerPage: 10000,
+		})
+		if err != nil {
+			return err
+		}
+
+		if page == 1 {
+			totalPages = appsOutput.TotalPages
+		}
+
+		providerApps = append(providerApps, appsOutput.Result...)
+	}
+
+	if len(providerApps) == 0 {
+		return ErrNoAppsToIndex
+	}
+
+	var apps []*App
+
+	for _, app := range providerApps {
+		apps = append(apps, convertProviderAppToApp(app))
+	}
+
+	return i.writer.WriteApps(apps)
+}
+
+func convertProviderAppToApp(provApp *provider.App) *App {
+	stakedTokens := new(big.Int)
+	stakedTokens, _ = stakedTokens.SetString(provApp.StakedTokens, 10)
+
+	return &App{
+		Address:      provApp.Address,
+		Jailed:       provApp.Jailed,
+		PublicKey:    provApp.PublicKey,
+		StakedTokens: stakedTokens,
 	}
 }

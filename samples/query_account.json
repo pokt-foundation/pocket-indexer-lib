@@ -1,0 +1,10 @@
+{
+    "address": "string",
+    "coins": [
+      {
+        "amount": "10000",
+        "denom": "string"
+      }
+    ],
+    "public_key": "string"
+}
