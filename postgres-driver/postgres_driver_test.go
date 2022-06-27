@@ -2,6 +2,7 @@ package postgresdriver
 
 import (
 	"errors"
+	"math/big"
 	"testing"
 	"time"
 
@@ -519,4 +520,299 @@ func TestPostgresDriver_GetBlocksQuantity(t *testing.T) {
 	maxHeight, err = driver.GetBlocksQuantity()
 	c.EqualError(err, "dummy error")
 	c.Empty(maxHeight)
+}
+
+func TestPostgresDriver_WriteAccount(t *testing.T) {
+	c := require.New(t)
+
+	db, mock, err := sqlmock.New()
+	c.NoError(err)
+
+	defer db.Close()
+
+	mock.ExpectExec("INSERT into accounts").WithArgs("00353abd21ef72725b295ba5a9a5eb6082548e21",
+		21, "212121", "upokt").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	driver := NewPostgresDriverFromSQLDBInstance(db)
+
+	err = driver.WriteAccount(&indexer.Account{
+		Address:             "00353abd21ef72725b295ba5a9a5eb6082548e21",
+		Height:              21,
+		Balance:             big.NewInt(212121),
+		BalanceDenomination: "upokt",
+	})
+	c.NoError(err)
+
+	mock.ExpectExec("INSERT into accounts").WithArgs("00353abd21ef72725b295ba5a9a5eb6082548e21",
+		21, "212121", "upokt").
+		WillReturnError(errors.New("dummy error"))
+
+	err = driver.WriteAccount(&indexer.Account{
+		Address:             "00353abd21ef72725b295ba5a9a5eb6082548e21",
+		Height:              21,
+		Balance:             big.NewInt(212121),
+		BalanceDenomination: "upokt",
+	})
+	c.EqualError(err, "dummy error")
+}
+
+func TestPostgresDriver_ReadAccountByAddressAndHeight(t *testing.T) {
+	c := require.New(t)
+
+	db, mock, err := sqlmock.New()
+	c.NoError(err)
+
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"id", "address", "height", "balance", "balance_denomination"}).
+		AddRow(1, "00353abd21ef72725b295ba5a9a5eb6082548e21", 21, "212121", "upokt")
+
+	mock.ExpectQuery("^SELECT (.+) FROM accounts (.+)").WillReturnRows(rows)
+
+	driver := NewPostgresDriverFromSQLDBInstance(db)
+
+	account, err := driver.ReadAccountByAddressAndHeight("00353abd21ef72725b295ba5a9a5eb6082548e2", 21)
+	c.Equal(ErrInvalidAddress, err)
+	c.Empty(account)
+
+	account, err = driver.ReadAccountByAddressAndHeight("00353abd21ef72725b295ba5a9a5eb6082548e21", 21)
+	c.NoError(err)
+	c.NotEmpty(account)
+
+	mock.ExpectQuery("^SELECT (.+) FROM accounts (.+)").WillReturnError(errors.New("dummy error"))
+
+	account, err = driver.ReadAccountByAddressAndHeight("00353abd21ef72725b295ba5a9a5eb6082548e21", 21)
+	c.EqualError(err, "dummy error")
+	c.Empty(account)
+}
+
+func TestPostgresDriver_ReadAccountsByHeight(t *testing.T) {
+	c := require.New(t)
+
+	db, mock, err := sqlmock.New()
+	c.NoError(err)
+
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"id", "address", "height", "balance", "balance_denomination"}).
+		AddRow(1, "00353abd21ef72725b295ba5a9a5eb6082548e21", 21, "212121", "upokt").
+		AddRow(2, "00353abd21ef72725b295ba5a9a5eb6082548e22", 21, "212121", "upokt")
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(".*").WillReturnRows(rows)
+	mock.ExpectCommit()
+
+	driver := NewPostgresDriverFromSQLDBInstance(db)
+
+	accounts, err := driver.ReadAccountsByHeight(21, &ReadAccountsByHeightOptions{Page: 21, PerPage: 7})
+	c.NoError(err)
+	c.Len(accounts, 2)
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(".*").WillReturnError(errors.New("dummy error"))
+	mock.ExpectCommit()
+
+	accounts, err = driver.ReadAccountsByHeight(21, &ReadAccountsByHeightOptions{})
+	c.EqualError(err, "dummy error")
+	c.Empty(accounts)
+}
+
+func TestPostgresDriver_WriteNodes(t *testing.T) {
+	c := require.New(t)
+
+	db, mock, err := sqlmock.New()
+	c.NoError(err)
+
+	defer db.Close()
+
+	mock.ExpectExec("INSERT into nodes").WithArgs("00353abd21ef72725b295ba5a9a5eb6082548e21", 21, false,
+		"01473af96ffc54c447f79d2fa06ee79e68c0dbd5b8257da25bf99dd89309c903", "https://dummy.com:6045", "212121").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	driver := NewPostgresDriverFromSQLDBInstance(db)
+
+	nodesToSend := []*indexer.Node{
+		{
+			Address:    "00353abd21ef72725b295ba5a9a5eb6082548e21",
+			Height:     21,
+			Jailed:     false,
+			PublicKey:  "01473af96ffc54c447f79d2fa06ee79e68c0dbd5b8257da25bf99dd89309c903",
+			ServiceURL: "https://dummy.com:6045",
+			Tokens:     big.NewInt(212121),
+		},
+	}
+
+	err = driver.WriteNodes(nodesToSend)
+	c.NoError(err)
+
+	mock.ExpectExec("INSERT into nodes").WithArgs("00353abd21ef72725b295ba5a9a5eb6082548e21", 21, false,
+		"01473af96ffc54c447f79d2fa06ee79e68c0dbd5b8257da25bf99dd89309c903", "https://dummy.com:6045", "212121").
+		WillReturnError(errors.New("dummy error"))
+
+	err = driver.WriteNodes(nodesToSend)
+	c.EqualError(err, "dummy error")
+}
+
+func TestPostgresDriver_ReadNodeByAddressAndHeight(t *testing.T) {
+	c := require.New(t)
+
+	db, mock, err := sqlmock.New()
+	c.NoError(err)
+
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"id", "address", "height", "jailed", "public_key", "service_url", "tokens"}).
+		AddRow(1, "00353abd21ef72725b295ba5a9a5eb6082548e21", 21, false,
+			"01473af96ffc54c447f79d2fa06ee79e68c0dbd5b8257da25bf99dd89309c903", "https://dummy.com:6045", "212121")
+
+	mock.ExpectQuery("^SELECT (.+) FROM nodes (.+)").WillReturnRows(rows)
+
+	driver := NewPostgresDriverFromSQLDBInstance(db)
+
+	node, err := driver.ReadNodeByAddressAndHeight("00353abd21ef72725b295ba5a9a5eb6082548e2", 21)
+	c.Equal(ErrInvalidAddress, err)
+	c.Empty(node)
+
+	node, err = driver.ReadNodeByAddressAndHeight("00353abd21ef72725b295ba5a9a5eb6082548e21", 21)
+	c.NoError(err)
+	c.NotEmpty(node)
+
+	mock.ExpectQuery("^SELECT (.+) FROM nodes (.+)").WillReturnError(errors.New("dummy error"))
+
+	node, err = driver.ReadNodeByAddressAndHeight("00353abd21ef72725b295ba5a9a5eb6082548e21", 21)
+	c.EqualError(err, "dummy error")
+	c.Empty(node)
+}
+
+func TestPostgresDriver_ReadNodesByHeight(t *testing.T) {
+	c := require.New(t)
+
+	db, mock, err := sqlmock.New()
+	c.NoError(err)
+
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"id", "address", "height", "jailed", "public_key", "service_url", "tokens"}).
+		AddRow(1, "00353abd21ef72725b295ba5a9a5eb6082548e21", 21, false,
+			"01473af96ffc54c447f79d2fa06ee79e68c0dbd5b8257da25bf99dd89309c903", "https://dummy.com:6045", "212121").
+		AddRow(1, "00353abd21ef72725b295ba5a9a5eb6082548e22", 21, false,
+			"01473af96ffc54c447f79d2fa06ee79e68c0dbd5b8257da25bf99dd89309c903", "https://dummy.com:6043", "212121")
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(".*").WillReturnRows(rows)
+	mock.ExpectCommit()
+
+	driver := NewPostgresDriverFromSQLDBInstance(db)
+
+	nodes, err := driver.ReadNodesByHeight(21, &ReadNodesByHeightOptions{Page: 21, PerPage: 7})
+	c.NoError(err)
+	c.Len(nodes, 2)
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(".*").WillReturnError(errors.New("dummy error"))
+	mock.ExpectCommit()
+
+	nodes, err = driver.ReadNodesByHeight(21, &ReadNodesByHeightOptions{})
+	c.EqualError(err, "dummy error")
+	c.Empty(nodes)
+}
+
+func TestPostgresDriver_WriteApps(t *testing.T) {
+	c := require.New(t)
+
+	db, mock, err := sqlmock.New()
+	c.NoError(err)
+
+	defer db.Close()
+
+	mock.ExpectExec("INSERT into apps").WithArgs("00353abd21ef72725b295ba5a9a5eb6082548e21", 21, false,
+		"01473af96ffc54c447f79d2fa06ee79e68c0dbd5b8257da25bf99dd89309c903", "212121").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	driver := NewPostgresDriverFromSQLDBInstance(db)
+
+	appsToSend := []*indexer.App{
+		{
+			Address:      "00353abd21ef72725b295ba5a9a5eb6082548e21",
+			Height:       21,
+			Jailed:       false,
+			PublicKey:    "01473af96ffc54c447f79d2fa06ee79e68c0dbd5b8257da25bf99dd89309c903",
+			StakedTokens: big.NewInt(212121),
+		},
+	}
+
+	err = driver.WriteApps(appsToSend)
+	c.NoError(err)
+
+	mock.ExpectExec("INSERT into apps").WithArgs("00353abd21ef72725b295ba5a9a5eb6082548e21", 21, false,
+		"01473af96ffc54c447f79d2fa06ee79e68c0dbd5b8257da25bf99dd89309c903", "212121").
+		WillReturnError(errors.New("dummy error"))
+
+	err = driver.WriteApps(appsToSend)
+	c.EqualError(err, "dummy error")
+}
+
+func TestPostgresDriver_ReadAppByAddressAndHeight(t *testing.T) {
+	c := require.New(t)
+
+	db, mock, err := sqlmock.New()
+	c.NoError(err)
+
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"id", "address", "height", "jailed", "public_key", "staked_tokens"}).
+		AddRow(1, "00353abd21ef72725b295ba5a9a5eb6082548e21", 21, false,
+			"01473af96ffc54c447f79d2fa06ee79e68c0dbd5b8257da25bf99dd89309c903", "212121")
+
+	mock.ExpectQuery("^SELECT (.+) FROM apps (.+)").WillReturnRows(rows)
+
+	driver := NewPostgresDriverFromSQLDBInstance(db)
+
+	app, err := driver.ReadAppByAddressAndHeight("00353abd21ef72725b295ba5a9a5eb6082548e2", 21)
+	c.Equal(ErrInvalidAddress, err)
+	c.Empty(app)
+
+	app, err = driver.ReadAppByAddressAndHeight("00353abd21ef72725b295ba5a9a5eb6082548e21", 21)
+	c.NoError(err)
+	c.NotEmpty(app)
+
+	mock.ExpectQuery("^SELECT (.+) FROM apps (.+)").WillReturnError(errors.New("dummy error"))
+
+	app, err = driver.ReadAppByAddressAndHeight("00353abd21ef72725b295ba5a9a5eb6082548e21", 21)
+	c.EqualError(err, "dummy error")
+	c.Empty(app)
+}
+
+func TestPostgresDriver_ReadAppsByHeight(t *testing.T) {
+	c := require.New(t)
+
+	db, mock, err := sqlmock.New()
+	c.NoError(err)
+
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"id", "address", "height", "jailed", "public_key", "staked_tokens"}).
+		AddRow(1, "00353abd21ef72725b295ba5a9a5eb6082548e21", 21, false,
+			"01473af96ffc54c447f79d2fa06ee79e68c0dbd5b8257da25bf99dd89309c903", "212121").
+		AddRow(1, "00353abd21ef72725b295ba5a9a5eb6082548e22", 21, false,
+			"01473af96ffc54c447f79d2fa06ee79e68c0dbd5b8257da25bf99dd89309c903", "212121")
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(".*").WillReturnRows(rows)
+	mock.ExpectCommit()
+
+	driver := NewPostgresDriverFromSQLDBInstance(db)
+
+	apps, err := driver.ReadAppsByHeight(21, &ReadAppsByHeightOptions{Page: 21, PerPage: 7})
+	c.NoError(err)
+	c.Len(apps, 2)
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(".*").WillReturnError(errors.New("dummy error"))
+	mock.ExpectCommit()
+
+	apps, err = driver.ReadAppsByHeight(21, &ReadAppsByHeightOptions{})
+	c.EqualError(err, "dummy error")
+	c.Empty(apps)
 }
