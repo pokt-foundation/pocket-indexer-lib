@@ -74,6 +74,9 @@ const (
 	selectCountFromBlocks                 = "SELECT COUNT(*) FROM blocks"
 	selectCountFromTransactionsByAddress  = "SELECT COUNT(*) FROM transactions WHERE from_address = $1 OR to_address = $1"
 	selectCountFromTransactionsByHeight   = "SELECT COUNT(*) FROM transactions WHERE height = $1"
+	selectCountFromAccountsByHeight       = "SELECT COUNT(*) FROM accounts WHERE height = $1"
+	selectCountFromNodesByHeight          = "SELECT COUNT(*) FROM nodes WHERE height = $1"
+	selectCountFromAppsByHeight           = "SELECT COUNT(*) FROM apps WHERE height = $1"
 	selectMaxHeightFromBlocks             = "SELECT MAX(height) FROM blocks"
 
 	defaultPerPage = 1000
@@ -670,6 +673,20 @@ func (d *PostgresDriver) ReadAccountsByHeight(height int, options *ReadAccountsB
 	return indexerAccounts, nil
 }
 
+// GetAccountsQuantityByHeight returns quantity of accounts with given height saved
+func (d *PostgresDriver) GetAccountsQuantityByHeight(height int) (int64, error) {
+	row := d.QueryRow(selectCountFromAccountsByHeight, height)
+
+	var quantity int64
+
+	err := row.Scan(&quantity)
+	if err != nil {
+		return 0, err
+	}
+
+	return quantity, nil
+}
+
 // dbNode is struct handler for the node with types needed for Postgres processing
 type dbNode struct {
 	ID         int    `db:"id"`
@@ -785,6 +802,20 @@ func (d *PostgresDriver) ReadNodesByHeight(height int, options *ReadNodesByHeigh
 	return indexerNodes, nil
 }
 
+// GetNodesQuantityByHeight returns quantity of nodes with given height saved
+func (d *PostgresDriver) GetNodesQuantityByHeight(height int) (int64, error) {
+	row := d.QueryRow(selectCountFromNodesByHeight, height)
+
+	var quantity int64
+
+	err := row.Scan(&quantity)
+	if err != nil {
+		return 0, err
+	}
+
+	return quantity, nil
+}
+
 // dbApp is struct handler for the app with types needed for Postgres processing
 type dbApp struct {
 	ID           int    `db:"id"`
@@ -895,4 +926,18 @@ func (d *PostgresDriver) ReadAppsByHeight(height int, options *ReadAppsByHeightO
 	}
 
 	return indexerApps, nil
+}
+
+// GetAppsQuantityByHeight returns quantity of apps with given height saved
+func (d *PostgresDriver) GetAppsQuantityByHeight(height int) (int64, error) {
+	row := d.QueryRow(selectCountFromAppsByHeight, height)
+
+	var quantity int64
+
+	err := row.Scan(&quantity)
+	if err != nil {
+		return 0, err
+	}
+
+	return quantity, nil
 }

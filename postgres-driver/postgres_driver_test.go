@@ -618,6 +618,31 @@ func TestPostgresDriver_ReadAccountsByHeight(t *testing.T) {
 	c.Empty(accounts)
 }
 
+func TestPostgresDriver_GetAccountsQuantityByHeight(t *testing.T) {
+	c := require.New(t)
+
+	db, mock, err := sqlmock.New()
+	c.NoError(err)
+
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"count"}).AddRow(100)
+
+	mock.ExpectQuery("^SELECT (.+) FROM accounts").WillReturnRows(rows)
+
+	driver := NewPostgresDriverFromSQLDBInstance(db)
+
+	maxHeight, err := driver.GetAccountsQuantityByHeight(21)
+	c.NoError(err)
+	c.Equal(int64(100), maxHeight)
+
+	mock.ExpectQuery("^SELECT (.+) FROM accounts").WillReturnError(errors.New("dummy error"))
+
+	maxHeight, err = driver.GetAccountsQuantityByHeight(21)
+	c.EqualError(err, "dummy error")
+	c.Empty(maxHeight)
+}
+
 func TestPostgresDriver_WriteNodes(t *testing.T) {
 	c := require.New(t)
 
@@ -718,6 +743,31 @@ func TestPostgresDriver_ReadNodesByHeight(t *testing.T) {
 	c.Empty(nodes)
 }
 
+func TestPostgresDriver_GetNodesQuantityByHeight(t *testing.T) {
+	c := require.New(t)
+
+	db, mock, err := sqlmock.New()
+	c.NoError(err)
+
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"count"}).AddRow(100)
+
+	mock.ExpectQuery("^SELECT (.+) FROM nodes").WillReturnRows(rows)
+
+	driver := NewPostgresDriverFromSQLDBInstance(db)
+
+	maxHeight, err := driver.GetNodesQuantityByHeight(21)
+	c.NoError(err)
+	c.Equal(int64(100), maxHeight)
+
+	mock.ExpectQuery("^SELECT (.+) FROM nodes").WillReturnError(errors.New("dummy error"))
+
+	maxHeight, err = driver.GetNodesQuantityByHeight(21)
+	c.EqualError(err, "dummy error")
+	c.Empty(maxHeight)
+}
+
 func TestPostgresDriver_WriteApps(t *testing.T) {
 	c := require.New(t)
 
@@ -815,4 +865,29 @@ func TestPostgresDriver_ReadAppsByHeight(t *testing.T) {
 	apps, err = driver.ReadAppsByHeight(21, &ReadAppsByHeightOptions{})
 	c.EqualError(err, "dummy error")
 	c.Empty(apps)
+}
+
+func TestPostgresDriver_GetAppsQuantityByHeight(t *testing.T) {
+	c := require.New(t)
+
+	db, mock, err := sqlmock.New()
+	c.NoError(err)
+
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"count"}).AddRow(100)
+
+	mock.ExpectQuery("^SELECT (.+) FROM apps").WillReturnRows(rows)
+
+	driver := NewPostgresDriverFromSQLDBInstance(db)
+
+	maxHeight, err := driver.GetAppsQuantityByHeight(21)
+	c.NoError(err)
+	c.Equal(int64(100), maxHeight)
+
+	mock.ExpectQuery("^SELECT (.+) FROM apps").WillReturnError(errors.New("dummy error"))
+
+	maxHeight, err = driver.GetAppsQuantityByHeight(21)
+	c.EqualError(err, "dummy error")
+	c.Empty(maxHeight)
 }
