@@ -244,7 +244,8 @@ type Node struct {
 }
 
 // IndexNodes converts nodes details to known structures and saves them
-func (i *Indexer) IndexNodes(blockHeight int) error {
+// returns all addresses indexed
+func (i *Indexer) IndexBlockNodes(blockHeight int) ([]string, error) {
 	totalPages := 1
 	var providerNodes []*provider.Node
 
@@ -255,7 +256,7 @@ func (i *Indexer) IndexNodes(blockHeight int) error {
 			PerPage: 10000,
 		})
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		if page == 1 {
@@ -266,16 +267,18 @@ func (i *Indexer) IndexNodes(blockHeight int) error {
 	}
 
 	if len(providerNodes) == 0 {
-		return ErrNoNodesToIndex
+		return nil, ErrNoNodesToIndex
 	}
 
 	var nodes []*Node
+	var addresses []string
 
 	for _, node := range providerNodes {
 		nodes = append(nodes, convertProviderNodeToNode(blockHeight, node))
+		addresses = append(addresses, node.Address)
 	}
 
-	return i.writer.WriteNodes(nodes)
+	return addresses, i.writer.WriteNodes(nodes)
 }
 
 func convertProviderNodeToNode(height int, provNode *provider.Node) *Node {
@@ -302,7 +305,8 @@ type App struct {
 }
 
 // IndexApps converts apps details to known structures and saved them
-func (i *Indexer) IndexApps(blockHeight int) error {
+// returns all addresses indexed
+func (i *Indexer) IndexBlockApps(blockHeight int) ([]string, error) {
 	totalPages := 1
 	var providerApps []*provider.App
 
@@ -313,7 +317,7 @@ func (i *Indexer) IndexApps(blockHeight int) error {
 			PerPage: 10000,
 		})
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		if page == 1 {
@@ -324,16 +328,18 @@ func (i *Indexer) IndexApps(blockHeight int) error {
 	}
 
 	if len(providerApps) == 0 {
-		return ErrNoAppsToIndex
+		return nil, ErrNoAppsToIndex
 	}
 
 	var apps []*App
+	var addresses []string
 
 	for _, app := range providerApps {
 		apps = append(apps, convertProviderAppToApp(blockHeight, app))
+		addresses = append(addresses, app.Address)
 	}
 
-	return i.writer.WriteApps(apps)
+	return addresses, i.writer.WriteApps(apps)
 }
 
 func convertProviderAppToApp(height int, provApp *provider.App) *App {
