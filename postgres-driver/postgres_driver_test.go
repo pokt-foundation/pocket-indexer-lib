@@ -1,6 +1,8 @@
 package postgresdriver
 
 import (
+	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"math/big"
 	"testing"
@@ -51,10 +53,19 @@ func TestPostgresDriver_WriteTransactions(t *testing.T) {
 	encodedTestStdTx, err := testStdTx.Value()
 	c.NoError(err)
 
-	mock.ExpectExec("INSERT into transactions").WithArgs("AF5BB3EAFF431E2E5E784D639825979FF20A779725BFE61D4521340F70C3996D0",
-		"addssd", nil, "adasdsfd", pq.StringArray([]string{"0021"}), "pos/Send", int64(0), int64(0), encodedTestStdTx,
-		[]uint8{123, 125}, "", int64(3223323), int64(10000), "upokt", 462000000).
+	mock.ExpectExec("INSERT into transactions").WithArgs(pq.StringArray([]string{"AF5BB3EAFF431E2E5E784D639825979FF20A779725BFE61D4521340F70C3996D0"}),
+		pq.StringArray([]string{"addssd"}), pq.Array([]sql.NullString{{}}), pq.StringArray([]string{"adasdsfd"}), pq.StringArray([]string{"0021"}),
+		pq.StringArray([]string{"pos/Send"}), pq.Int64Array([]int64{0}), pq.Int64Array([]int64{0}), pq.Array([]driver.Value{encodedTestStdTx}),
+		pq.Array([]driver.Value{"{}"}), pq.StringArray([]string{""}), pq.Int64Array([]int64{3223323}), pq.Int64Array([]int64{10000}),
+		pq.StringArray([]string{"upokt"}), pq.Int64Array([]int64{462000000})).
 		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	mock.ExpectExec("INSERT into transactions").WithArgs(pq.StringArray([]string{"AF5BB3EAFF431E2E5E784D639825979FF20A779725BFE61D4521340F70C3996D0"}),
+		pq.StringArray([]string{"addssd"}), pq.Array([]sql.NullString{{}}), pq.StringArray([]string{"adasdsfd"}), pq.StringArray([]string{"0021"}),
+		pq.StringArray([]string{"pos/Send"}), pq.Int64Array([]int64{0}), pq.Int64Array([]int64{0}), pq.Array([]driver.Value{encodedTestStdTx}),
+		pq.Array([]driver.Value{"{}"}), pq.StringArray([]string{""}), pq.Int64Array([]int64{3223323}), pq.Int64Array([]int64{10000}),
+		pq.StringArray([]string{"upokt"}), pq.Int64Array([]int64{462000000})).
+		WillReturnError(errors.New("dummy error"))
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
@@ -76,11 +87,6 @@ func TestPostgresDriver_WriteTransactions(t *testing.T) {
 
 	err = driver.WriteTransactions(transactionToSend)
 	c.NoError(err)
-
-	mock.ExpectExec("INSERT into transactions").WithArgs("AF5BB3EAFF431E2E5E784D639825979FF20A779725BFE61D4521340F70C3996D0",
-		"addssd", nil, "adasdsfd", pq.StringArray([]string{"0021"}), "pos/Send", int64(0), int64(0), encodedTestStdTx,
-		[]uint8{123, 125}, "", int64(3223323), int64(10000), "upokt", 462000000).
-		WillReturnError(errors.New("dummy error"))
 
 	err = driver.WriteTransactions(transactionToSend)
 	c.EqualError(err, "dummy error")
@@ -651,8 +657,9 @@ func TestPostgresDriver_WriteNodes(t *testing.T) {
 
 	defer db.Close()
 
-	mock.ExpectExec("INSERT into nodes").WithArgs("00353abd21ef72725b295ba5a9a5eb6082548e21", 21, false,
-		"01473af96ffc54c447f79d2fa06ee79e68c0dbd5b8257da25bf99dd89309c903", "https://dummy.com:6045", "212121").
+	mock.ExpectExec("INSERT into nodes").WithArgs(pq.StringArray([]string{"00353abd21ef72725b295ba5a9a5eb6082548e21"}), pq.Int64Array([]int64{21}),
+		pq.BoolArray([]bool{false}), pq.StringArray([]string{"01473af96ffc54c447f79d2fa06ee79e68c0dbd5b8257da25bf99dd89309c903"}),
+		pq.StringArray([]string{"https://dummy.com:6045"}), pq.StringArray([]string{"212121"})).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
@@ -671,8 +678,9 @@ func TestPostgresDriver_WriteNodes(t *testing.T) {
 	err = driver.WriteNodes(nodesToSend)
 	c.NoError(err)
 
-	mock.ExpectExec("INSERT into nodes").WithArgs("00353abd21ef72725b295ba5a9a5eb6082548e21", 21, false,
-		"01473af96ffc54c447f79d2fa06ee79e68c0dbd5b8257da25bf99dd89309c903", "https://dummy.com:6045", "212121").
+	mock.ExpectExec("INSERT into nodes").WithArgs(pq.StringArray([]string{"00353abd21ef72725b295ba5a9a5eb6082548e21"}), pq.Int64Array([]int64{21}),
+		pq.BoolArray([]bool{false}), pq.StringArray([]string{"01473af96ffc54c447f79d2fa06ee79e68c0dbd5b8257da25bf99dd89309c903"}),
+		pq.StringArray([]string{"https://dummy.com:6045"}), pq.StringArray([]string{"212121"})).
 		WillReturnError(errors.New("dummy error"))
 
 	err = driver.WriteNodes(nodesToSend)
@@ -776,8 +784,9 @@ func TestPostgresDriver_WriteApps(t *testing.T) {
 
 	defer db.Close()
 
-	mock.ExpectExec("INSERT into apps").WithArgs("00353abd21ef72725b295ba5a9a5eb6082548e21", 21, false,
-		"01473af96ffc54c447f79d2fa06ee79e68c0dbd5b8257da25bf99dd89309c903", "212121").
+	mock.ExpectExec("INSERT into apps").WithArgs(pq.StringArray([]string{"00353abd21ef72725b295ba5a9a5eb6082548e21"}), pq.Int64Array([]int64{21}),
+		pq.BoolArray([]bool{false}), pq.StringArray([]string{"01473af96ffc54c447f79d2fa06ee79e68c0dbd5b8257da25bf99dd89309c903"}),
+		pq.StringArray([]string{"212121"})).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
@@ -795,8 +804,9 @@ func TestPostgresDriver_WriteApps(t *testing.T) {
 	err = driver.WriteApps(appsToSend)
 	c.NoError(err)
 
-	mock.ExpectExec("INSERT into apps").WithArgs("00353abd21ef72725b295ba5a9a5eb6082548e21", 21, false,
-		"01473af96ffc54c447f79d2fa06ee79e68c0dbd5b8257da25bf99dd89309c903", "212121").
+	mock.ExpectExec("INSERT into apps").WithArgs(pq.StringArray([]string{"00353abd21ef72725b295ba5a9a5eb6082548e21"}), pq.Int64Array([]int64{21}),
+		pq.BoolArray([]bool{false}), pq.StringArray([]string{"01473af96ffc54c447f79d2fa06ee79e68c0dbd5b8257da25bf99dd89309c903"}),
+		pq.StringArray([]string{"212121"})).
 		WillReturnError(errors.New("dummy error"))
 
 	err = driver.WriteApps(appsToSend)
