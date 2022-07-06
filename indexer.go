@@ -220,16 +220,20 @@ func (i *Indexer) IndexAccount(address string, blockHeight int) error {
 }
 
 func convertProviderAccountToAccount(height int, providerAccount *provider.GetAccountOutput) *Account {
-	coins := providerAccount.Coins[0]
-
+	var balanceDenomination string
 	balance := new(big.Int)
-	balance, _ = balance.SetString(coins.Amount, 10)
+
+	if len(providerAccount.Coins) == 1 {
+		coins := providerAccount.Coins[0]
+		balance, _ = balance.SetString(coins.Amount, 10)
+		balanceDenomination = coins.Denom
+	}
 
 	return &Account{
 		Address:             providerAccount.Address,
 		Height:              height,
 		Balance:             balance,
-		BalanceDenomination: coins.Denom,
+		BalanceDenomination: balanceDenomination,
 	}
 }
 
@@ -243,7 +247,7 @@ type Node struct {
 	Tokens     *big.Int
 }
 
-// IndexNodes converts nodes details to known structures and saves them
+// IndexBlockNodes converts nodes details to known structures and saves them
 // returns all addresses indexed
 func (i *Indexer) IndexBlockNodes(blockHeight int) ([]string, error) {
 	totalPages := 1
@@ -304,7 +308,7 @@ type App struct {
 	StakedTokens *big.Int
 }
 
-// IndexApps converts apps details to known structures and saved them
+// IndexBlockApps converts apps details to known structures and saved them
 // returns all addresses indexed
 func (i *Indexer) IndexBlockApps(blockHeight int) ([]string, error) {
 	totalPages := 1
