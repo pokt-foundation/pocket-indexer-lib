@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -19,6 +20,15 @@ const (
 	insertBlockScript = `
 	INSERT into blocks (hash, height, time, proposer_address, tx_count)
 	VALUES (:hash, :height, :time, :proposer_address, :tx_count)`
+	insertAccountScript = `
+	INSERT into accounts (address, height, balance, balance_denomination)
+	VALUES (:address, :height, :balance, :balance_denomination)`
+	insertNodesScript = `
+	INSERT into nodes (address, height, jailed, public_key, service_url, tokens)
+	VALUES (:address, :height, :jailed, :public_key, :service_url, :tokens)`
+	insertAppsScript = `
+	INSERT into apps (address, height, jailed, public_key, staked_tokens)
+	VALUES (:address, :height, :jailed, :public_key, :staked_tokens)`
 	selectTransactionsScript = `
 	DECLARE transactions_cursor CURSOR FOR SELECT * FROM transactions ORDER BY height DESC;
 	MOVE absolute %d from transactions_cursor;
@@ -41,12 +51,33 @@ const (
 	MOVE absolute %d from transactions_cursor;
 	FETCH %d FROM transactions_cursor;
 	`
-	selectBlockByHeightScript            = "SELECT * FROM blocks WHERE height = $1"
-	selectCountFromTransactions          = "SELECT COUNT(*) FROM transactions"
-	selectCountFromBlocks                = "SELECT COUNT(*) FROM blocks"
-	selectCountFromTransactionsByAddress = "SELECT COUNT(*) FROM transactions WHERE from_address = $1 OR to_address = $1"
-	selectCountFromTransactionsByHeight  = "SELECT COUNT(*) FROM transactions WHERE height = $1"
-	selectMaxHeightFromBlocks            = "SELECT MAX(height) FROM blocks"
+	selectAccountsByHeightScript = `
+	DECLARE accounts_cursor CURSOR FOR SELECT * FROM accounts WHERE height = '%d';
+	MOVE absolute %d from accounts_cursor;
+	FETCH %d FROM accounts_cursor;
+	`
+	selectNodesByHeightScript = `
+	DECLARE nodes_cursor CURSOR FOR SELECT * FROM nodes WHERE height = '%d';
+	MOVE absolute %d from nodes_cursor;
+	FETCH %d FROM nodes_cursor;
+	`
+	selectAppsByHeightScript = `
+	DECLARE apps_cursor CURSOR FOR SELECT * FROM apps WHERE height = '%d';
+	MOVE absolute %d from apps_cursor;
+	FETCH %d FROM apps_cursor;
+	`
+	selectBlockByHeightScript             = "SELECT * FROM blocks WHERE height = $1"
+	selectAccountByAddressAndHeightScript = "SELECT * FROM accounts WHERE address = $1 AND height = $2"
+	selectNodeByAddressAndHeightScript    = "SELECT * FROM nodes WHERE address = $1 AND height = $2"
+	selectAppByAddressAndHeightScript     = "SELECT * FROM apps WHERE address = $1 AND height = $2"
+	selectCountFromTransactions           = "SELECT COUNT(*) FROM transactions"
+	selectCountFromBlocks                 = "SELECT COUNT(*) FROM blocks"
+	selectCountFromTransactionsByAddress  = "SELECT COUNT(*) FROM transactions WHERE from_address = $1 OR to_address = $1"
+	selectCountFromTransactionsByHeight   = "SELECT COUNT(*) FROM transactions WHERE height = $1"
+	selectCountFromAccountsByHeight       = "SELECT COUNT(*) FROM accounts WHERE height = $1"
+	selectCountFromNodesByHeight          = "SELECT COUNT(*) FROM nodes WHERE height = $1"
+	selectCountFromAppsByHeight           = "SELECT COUNT(*) FROM apps WHERE height = $1"
+	selectMaxHeightFromBlocks             = "SELECT MAX(height) FROM blocks"
 
 	defaultPerPage = 1000
 	defaultPage    = 1
@@ -528,6 +559,378 @@ func (d *PostgresDriver) GetMaxHeightInBlocks() (int64, error) {
 // GetBlocksQuantity returns quantity of blocks saved
 func (d *PostgresDriver) GetBlocksQuantity() (int64, error) {
 	row := d.QueryRow(selectCountFromBlocks)
+
+	var quantity int64
+
+	err := row.Scan(&quantity)
+	if err != nil {
+		return 0, err
+	}
+
+	return quantity, nil
+}
+
+// dbAccount is struct handler for the account with types needed for Postgres processing
+type dbAccount struct {
+	ID                  int    `db:"id"`
+	Address             string `db:"address"`
+	Height              int    `db:"height"`
+	Balance             string `db:"balance"`
+	BalanceDenomination string `db:"balance_denomination"`
+}
+
+func (a *dbAccount) toIndexerAccount() *indexer.Account {
+	balance := new(big.Int)
+	balance, _ = balance.SetString(a.Balance, 10)
+
+	return &indexer.Account{
+		Address:             a.Address,
+		Height:              a.Height,
+		Balance:             balance,
+		BalanceDenomination: a.BalanceDenomination,
+	}
+}
+
+func convertIndexerAccountToDBAccount(indexerAccount *indexer.Account) *dbAccount {
+	return &dbAccount{
+		Address:             indexerAccount.Address,
+		Height:              indexerAccount.Height,
+		Balance:             indexerAccount.Balance.String(),
+		BalanceDenomination: indexerAccount.BalanceDenomination,
+	}
+}
+
+// WriteAccount inserts given account to the database
+func (d *PostgresDriver) WriteAccount(account *indexer.Account) error {
+	_, err := d.NamedExec(insertAccountScript, convertIndexerAccountToDBAccount(account))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ReadAccountByAddressAndHeight returns an account in the database with given address and height
+func (d *PostgresDriver) ReadAccountByAddressAndHeight(address string, height int) (*indexer.Account, error) {
+	if !utils.ValidateAddress(address) {
+		return nil, ErrInvalidAddress
+	}
+
+	var dbAccount dbAccount
+
+	err := d.Get(&dbAccount, selectAccountByAddressAndHeightScript, address, height)
+	if err != nil {
+		return nil, err
+	}
+
+	return dbAccount.toIndexerAccount(), nil
+}
+
+// ReadAccountsByHeightOptions optional parameters for ReadAccountsByHeight
+type ReadAccountsByHeightOptions struct {
+	PerPage int
+	Page    int
+}
+
+// ReadAccountsByHeight returns accounts with given height
+// Optional values defaults: page: 1, perPage: 1000
+func (d *PostgresDriver) ReadAccountsByHeight(height int, options *ReadAccountsByHeightOptions) ([]*indexer.Account, error) {
+	perPage := defaultPerPage
+	page := defaultPage
+
+	if options != nil {
+		perPage = getPerPageValue(options.PerPage)
+		page = getPageValue(options.Page)
+	}
+
+	move := getMoveValue(perPage, page)
+
+	tx, err := d.Beginx()
+	if err != nil {
+		return nil, err
+	}
+
+	query := fmt.Sprintf(selectAccountsByHeightScript, height, move, perPage)
+
+	var accounts []*dbAccount
+
+	err = tx.Select(&accounts, query)
+	if err != nil {
+		return nil, err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return nil, err
+	}
+
+	var indexerAccounts []*indexer.Account
+
+	for _, dbAccount := range accounts {
+		indexerAccounts = append(indexerAccounts, dbAccount.toIndexerAccount())
+	}
+
+	return indexerAccounts, nil
+}
+
+// GetAccountsQuantityByHeight returns quantity of accounts with given height saved
+func (d *PostgresDriver) GetAccountsQuantityByHeight(height int) (int64, error) {
+	row := d.QueryRow(selectCountFromAccountsByHeight, height)
+
+	var quantity int64
+
+	err := row.Scan(&quantity)
+	if err != nil {
+		return 0, err
+	}
+
+	return quantity, nil
+}
+
+// dbNode is struct handler for the node with types needed for Postgres processing
+type dbNode struct {
+	ID         int    `db:"id"`
+	Address    string `db:"address"`
+	Height     int    `db:"height"`
+	Jailed     bool   `db:"jailed"`
+	PublicKey  string `db:"public_key"`
+	ServiceURL string `db:"service_url"`
+	Tokens     string `db:"tokens"`
+}
+
+func (n *dbNode) toIndexerNode() *indexer.Node {
+	tokens := new(big.Int)
+	tokens, _ = tokens.SetString(n.Tokens, 10)
+
+	return &indexer.Node{
+		Address:    n.Address,
+		Height:     n.Height,
+		Jailed:     n.Jailed,
+		PublicKey:  n.PublicKey,
+		ServiceURL: n.ServiceURL,
+		Tokens:     tokens,
+	}
+}
+
+func convertIndexerNodeToDBNode(indexerNode *indexer.Node) *dbNode {
+	return &dbNode{
+		Address:    indexerNode.Address,
+		Height:     indexerNode.Height,
+		Jailed:     indexerNode.Jailed,
+		PublicKey:  indexerNode.PublicKey,
+		ServiceURL: indexerNode.ServiceURL,
+		Tokens:     indexerNode.Tokens.String(),
+	}
+}
+
+// WriteNodes inserts given nodes to the database
+func (d *PostgresDriver) WriteNodes(nodes []*indexer.Node) error {
+	var dbNodes []*dbNode
+
+	for _, node := range nodes {
+		dbNodes = append(dbNodes, convertIndexerNodeToDBNode(node))
+	}
+
+	_, err := d.NamedExec(insertNodesScript, dbNodes)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ReadNodeByAddressAndHeight returns a node in the database with given address and height
+func (d *PostgresDriver) ReadNodeByAddressAndHeight(address string, height int) (*indexer.Node, error) {
+	if !utils.ValidateAddress(address) {
+		return nil, ErrInvalidAddress
+	}
+
+	var dbNode dbNode
+
+	err := d.Get(&dbNode, selectNodeByAddressAndHeightScript, address, height)
+	if err != nil {
+		return nil, err
+	}
+
+	return dbNode.toIndexerNode(), nil
+}
+
+// ReadNodesByHeightOptions optional parameters for ReadNodesByHeight
+type ReadNodesByHeightOptions struct {
+	PerPage int
+	Page    int
+}
+
+// ReadNodesByHeight returns nodes with given height
+// Optional values defaults: page: 1, perPage: 1000
+func (d *PostgresDriver) ReadNodesByHeight(height int, options *ReadNodesByHeightOptions) ([]*indexer.Node, error) {
+	perPage := defaultPerPage
+	page := defaultPage
+
+	if options != nil {
+		perPage = getPerPageValue(options.PerPage)
+		page = getPageValue(options.Page)
+	}
+
+	move := getMoveValue(perPage, page)
+
+	tx, err := d.Beginx()
+	if err != nil {
+		return nil, err
+	}
+
+	query := fmt.Sprintf(selectNodesByHeightScript, height, move, perPage)
+
+	var nodes []*dbNode
+
+	err = tx.Select(&nodes, query)
+	if err != nil {
+		return nil, err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return nil, err
+	}
+
+	var indexerNodes []*indexer.Node
+
+	for _, dbNode := range nodes {
+		indexerNodes = append(indexerNodes, dbNode.toIndexerNode())
+	}
+
+	return indexerNodes, nil
+}
+
+// GetNodesQuantityByHeight returns quantity of nodes with given height saved
+func (d *PostgresDriver) GetNodesQuantityByHeight(height int) (int64, error) {
+	row := d.QueryRow(selectCountFromNodesByHeight, height)
+
+	var quantity int64
+
+	err := row.Scan(&quantity)
+	if err != nil {
+		return 0, err
+	}
+
+	return quantity, nil
+}
+
+// dbApp is struct handler for the app with types needed for Postgres processing
+type dbApp struct {
+	ID           int    `db:"id"`
+	Address      string `db:"address"`
+	Height       int    `db:"height"`
+	Jailed       bool   `db:"jailed"`
+	PublicKey    string `db:"public_key"`
+	StakedTokens string `db:"staked_tokens"`
+}
+
+func (a *dbApp) toIndexerApp() *indexer.App {
+	stakedTokens := new(big.Int)
+	stakedTokens, _ = stakedTokens.SetString(a.StakedTokens, 10)
+
+	return &indexer.App{
+		Address:      a.Address,
+		Height:       a.Height,
+		Jailed:       a.Jailed,
+		PublicKey:    a.PublicKey,
+		StakedTokens: stakedTokens,
+	}
+}
+
+func convertIndexerAppToDBApp(indexerApp *indexer.App) *dbApp {
+	return &dbApp{
+		Address:      indexerApp.Address,
+		Height:       indexerApp.Height,
+		Jailed:       indexerApp.Jailed,
+		PublicKey:    indexerApp.PublicKey,
+		StakedTokens: indexerApp.StakedTokens.String(),
+	}
+}
+
+// WriteApps inserts given apps to the database
+func (d *PostgresDriver) WriteApps(apps []*indexer.App) error {
+	var dbApps []*dbApp
+
+	for _, app := range apps {
+		dbApps = append(dbApps, convertIndexerAppToDBApp(app))
+	}
+
+	_, err := d.NamedExec(insertAppsScript, dbApps)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ReadAppByAddressAndHeight returns an app in the database with given address and height
+func (d *PostgresDriver) ReadAppByAddressAndHeight(address string, height int) (*indexer.App, error) {
+	if !utils.ValidateAddress(address) {
+		return nil, ErrInvalidAddress
+	}
+
+	var dbApp dbApp
+
+	err := d.Get(&dbApp, selectAppByAddressAndHeightScript, address, height)
+	if err != nil {
+		return nil, err
+	}
+
+	return dbApp.toIndexerApp(), nil
+}
+
+// ReadAppsByHeightOptions optional parameters for ReadAppsByHeight
+type ReadAppsByHeightOptions struct {
+	PerPage int
+	Page    int
+}
+
+// ReadAppsByHeight returns apps with given height
+// Optional values defaults: page: 1, perPage: 1000
+func (d *PostgresDriver) ReadAppsByHeight(height int, options *ReadAppsByHeightOptions) ([]*indexer.App, error) {
+	perPage := defaultPerPage
+	page := defaultPage
+
+	if options != nil {
+		perPage = getPerPageValue(options.PerPage)
+		page = getPageValue(options.Page)
+	}
+
+	move := getMoveValue(perPage, page)
+
+	tx, err := d.Beginx()
+	if err != nil {
+		return nil, err
+	}
+
+	query := fmt.Sprintf(selectAppsByHeightScript, height, move, perPage)
+
+	var apps []*dbApp
+
+	err = tx.Select(&apps, query)
+	if err != nil {
+		return nil, err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return nil, err
+	}
+
+	var indexerApps []*indexer.App
+
+	for _, dbApp := range apps {
+		indexerApps = append(indexerApps, dbApp.toIndexerApp())
+	}
+
+	return indexerApps, nil
+}
+
+// GetAppsQuantityByHeight returns quantity of apps with given height saved
+func (d *PostgresDriver) GetAppsQuantityByHeight(height int) (int64, error) {
+	row := d.QueryRow(selectCountFromAppsByHeight, height)
 
 	var quantity int64
 

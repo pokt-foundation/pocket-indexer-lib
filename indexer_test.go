@@ -29,6 +29,24 @@ func (w *writerMock) WriteTransactions(txs []*Transaction) error {
 	return args.Error(0)
 }
 
+func (w *writerMock) WriteAccount(account *Account) error {
+	args := w.Called(account)
+
+	return args.Error(0)
+}
+
+func (w *writerMock) WriteNodes(nodes []*Node) error {
+	args := w.Called(nodes)
+
+	return args.Error(0)
+}
+
+func (w *writerMock) WriteApps(apps []*App) error {
+	args := w.Called(apps)
+
+	return args.Error(0)
+}
+
 func TestIndexer_IndexBlockTransactions(t *testing.T) {
 	c := require.New(t)
 
@@ -108,4 +126,124 @@ func TestIndexer_IndexBlock(t *testing.T) {
 
 	err = indexer.IndexBlock(30363)
 	c.NoError(err)
+}
+
+func TestIndexer_IndexAccount(t *testing.T) {
+	c := require.New(t)
+
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	reqProvider := provider.NewProvider("https://dummy.com", []string{})
+
+	writerMock := &writerMock{}
+
+	indexer := NewIndexer(reqProvider, writerMock)
+
+	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryAccountRoute),
+		http.StatusInternalServerError, "samples/query_account.json")
+
+	err := indexer.IndexAccount("ABCD", 30363)
+	c.Equal(provider.Err5xxOnConnection, err)
+
+	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryAccountRoute),
+		http.StatusOK, "samples/query_account.json")
+
+	writerMock.On("WriteAccount", testMock.Anything).Return(errors.New("forced failure")).Once()
+
+	err = indexer.IndexAccount("ABCD", 30363)
+	c.EqualError(err, "forced failure")
+
+	writerMock.On("WriteAccount", testMock.Anything).Return(nil).Once()
+
+	err = indexer.IndexAccount("ABCD", 30363)
+	c.NoError(err)
+}
+
+func TestIndexer_IndexBlockNodes(t *testing.T) {
+	c := require.New(t)
+
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	reqProvider := provider.NewProvider("https://dummy.com", []string{})
+
+	writerMock := &writerMock{}
+
+	indexer := NewIndexer(reqProvider, writerMock)
+
+	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryNodesRoute),
+		http.StatusInternalServerError, "samples/query_nodes.json")
+
+	addresses, err := indexer.IndexBlockNodes(30363)
+	c.Equal(provider.Err5xxOnConnection, err)
+	c.Empty(addresses)
+
+	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryNodesRoute),
+		http.StatusOK, "samples/query_nodes_empty.json")
+
+	addresses, err = indexer.IndexBlockNodes(30363)
+	c.Equal(ErrNoNodesToIndex, err)
+	c.Empty(addresses)
+
+	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryNodesRoute),
+		http.StatusOK, "samples/query_nodes.json")
+
+	writerMock.On("WriteNodes", testMock.Anything).Return(errors.New("forced failure")).Once()
+
+	addresses, err = indexer.IndexBlockNodes(30363)
+	c.EqualError(err, "forced failure")
+	c.Len(addresses, 1)
+	c.Equal("98a18a38aa6826a55dccce19f607e3171cf1436e", addresses[0])
+
+	writerMock.On("WriteNodes", testMock.Anything).Return(nil).Once()
+
+	addresses, err = indexer.IndexBlockNodes(30363)
+	c.NoError(err)
+	c.Len(addresses, 1)
+	c.Equal("98a18a38aa6826a55dccce19f607e3171cf1436e", addresses[0])
+}
+
+func TestIndexer_IndexBlockApps(t *testing.T) {
+	c := require.New(t)
+
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	reqProvider := provider.NewProvider("https://dummy.com", []string{})
+
+	writerMock := &writerMock{}
+
+	indexer := NewIndexer(reqProvider, writerMock)
+
+	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryAppsRoute),
+		http.StatusInternalServerError, "samples/query_apps.json")
+
+	addresses, err := indexer.IndexBlockApps(30363)
+	c.Equal(provider.Err5xxOnConnection, err)
+	c.Empty(addresses)
+
+	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryAppsRoute),
+		http.StatusOK, "samples/query_apps_empty.json")
+
+	addresses, err = indexer.IndexBlockApps(30363)
+	c.Equal(ErrNoAppsToIndex, err)
+	c.Empty(addresses)
+
+	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryAppsRoute),
+		http.StatusOK, "samples/query_apps.json")
+
+	writerMock.On("WriteApps", testMock.Anything).Return(errors.New("forced failure")).Once()
+
+	addresses, err = indexer.IndexBlockApps(30363)
+	c.EqualError(err, "forced failure")
+	c.Len(addresses, 1)
+	c.Equal("98a18a38aa6826a55dccce19f607e3171cf14366", addresses[0])
+
+	writerMock.On("WriteApps", testMock.Anything).Return(nil).Once()
+
+	addresses, err = indexer.IndexBlockApps(30363)
+	c.NoError(err)
+	c.Len(addresses, 1)
+	c.Equal("98a18a38aa6826a55dccce19f607e3171cf14366", addresses[0])
 }
