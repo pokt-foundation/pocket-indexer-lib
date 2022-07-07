@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -16,7 +17,9 @@ import (
 const (
 	insertTransactionsScript = `
 	INSERT into transactions (hash, from_address, to_address, app_pub_key, blockchains, message_type, height, index, stdtx, tx_result, tx, entropy, fee, fee_denomination, amount)
-	VALUES (:hash, :from_address, :to_address, :app_pub_key, :blockchains, :message_type, :height, :index, :stdtx, :tx_result, :tx, :entropy, :fee, :fee_denomination, :amount)`
+	(
+		select * from unnest($1::text[], $2::text[], $3::text[], $4::text[], $5::text[], $6::text[], $7::int[], $8::int[], $9::jsonb[], $10::jsonb[], $11::text[], $12::numeric[], $13::int[], $14::text[], $15::int[])
+	)`
 	insertBlockScript = `
 	INSERT into blocks (hash, height, time, proposer_address, tx_count)
 	VALUES (:hash, :height, :time, :proposer_address, :tx_count)`
@@ -25,10 +28,14 @@ const (
 	VALUES (:address, :height, :balance, :balance_denomination)`
 	insertNodesScript = `
 	INSERT into nodes (address, height, jailed, public_key, service_url, tokens)
-	VALUES (:address, :height, :jailed, :public_key, :service_url, :tokens)`
+	(
+		select * from unnest($1::text[], $2::int[], $3::boolean[], $4::text[], $5::text[], $6::numeric[])
+	)`
 	insertAppsScript = `
 	INSERT into apps (address, height, jailed, public_key, staked_tokens)
-	VALUES (:address, :height, :jailed, :public_key, :staked_tokens)`
+	(
+		select * from unnest($1::text[], $2::int[], $3::boolean[], $4::text[], $5::numeric[])
+	)`
 	selectTransactionsScript = `
 	DECLARE transactions_cursor CURSOR FOR SELECT * FROM transactions ORDER BY height DESC;
 	MOVE absolute %d from transactions_cursor;
@@ -81,6 +88,8 @@ const (
 
 	defaultPerPage = 1000
 	defaultPage    = 1
+
+	chainsSeparator = ","
 )
 
 var (
@@ -137,22 +146,23 @@ func getMoveValue(perPage, page int) int {
 
 // dbTransaction is struct handler for the transaction with types needed for Postgres processing
 type dbTransaction struct {
-	ID              int            `db:"id"`
-	Hash            string         `db:"hash"`
-	FromAddress     sql.NullString `db:"from_address"`
-	ToAddress       sql.NullString `db:"to_address"`
-	AppPubKey       string         `db:"app_pub_key"`
-	Blockchains     pq.StringArray `db:"blockchains"`
-	MessageType     string         `db:"message_type"`
-	Height          int            `db:"height"`
-	Index           int            `db:"index"`
-	StdTx           *stdTx         `db:"stdtx"`
-	TxResult        *txResult      `db:"tx_result"`
-	Tx              string         `db:"tx"`
-	Entropy         int            `db:"entropy"`
-	Fee             int            `db:"fee"`
-	FeeDenomination string         `db:"fee_denomination"`
-	Amount          int            `db:"amount"`
+	ID          int            `db:"id"`
+	Hash        string         `db:"hash"`
+	FromAddress sql.NullString `db:"from_address"`
+	ToAddress   sql.NullString `db:"to_address"`
+	AppPubKey   string         `db:"app_pub_key"`
+	// It is necessary to save Blockchains as a joined string to be able to use SQL's Unnest with this field
+	Blockchains     string    `db:"blockchains"`
+	MessageType     string    `db:"message_type"`
+	Height          int       `db:"height"`
+	Index           int       `db:"index"`
+	StdTx           *stdTx    `db:"stdtx"`
+	TxResult        *txResult `db:"tx_result"`
+	Tx              string    `db:"tx"`
+	Entropy         int       `db:"entropy"`
+	Fee             int       `db:"fee"`
+	FeeDenomination string    `db:"fee_denomination"`
+	Amount          int       `db:"amount"`
 }
 
 func (t *dbTransaction) toIndexerTransaction() *indexer.Transaction {
@@ -161,7 +171,7 @@ func (t *dbTransaction) toIndexerTransaction() *indexer.Transaction {
 		FromAddress:     t.FromAddress.String,
 		ToAddress:       t.ToAddress.String,
 		AppPubKey:       t.AppPubKey,
-		Blockchains:     t.Blockchains,
+		Blockchains:     strings.Split(t.Blockchains, chainsSeparator),
 		MessageType:     t.MessageType,
 		Height:          t.Height,
 		Index:           t.Index,
@@ -192,7 +202,7 @@ func convertIndexerTransactionToDBTransaction(indexerTransaction *indexer.Transa
 		FromAddress:     newSQLNullString(indexerTransaction.FromAddress),
 		ToAddress:       newSQLNullString(indexerTransaction.ToAddress),
 		AppPubKey:       indexerTransaction.AppPubKey,
-		Blockchains:     indexerTransaction.Blockchains,
+		Blockchains:     strings.Join(indexerTransaction.Blockchains, chainsSeparator),
 		MessageType:     indexerTransaction.MessageType,
 		Height:          indexerTransaction.Height,
 		Index:           indexerTransaction.Index,
@@ -208,13 +218,47 @@ func convertIndexerTransactionToDBTransaction(indexerTransaction *indexer.Transa
 
 // WriteTransactions inserts given transactions to the database
 func (d *PostgresDriver) WriteTransactions(txs []*indexer.Transaction) error {
-	var transactions []*dbTransaction
+	var hashes, appPubKeys, blockChains, messageTypes, txStrings, feeDenominations []string
+	var fromAddresses, toAddresses []sql.NullString
+	var heights, indexes, entropies, fees, amounts []int64
+	var stdTxs []*stdTx
+	var txResults []*txResult
 
 	for _, tx := range txs {
-		transactions = append(transactions, convertIndexerTransactionToDBTransaction(tx))
+		dbTransaction := convertIndexerTransactionToDBTransaction(tx)
+		hashes = append(hashes, dbTransaction.Hash)
+		fromAddresses = append(fromAddresses, dbTransaction.FromAddress)
+		toAddresses = append(toAddresses, dbTransaction.ToAddress)
+		appPubKeys = append(appPubKeys, dbTransaction.AppPubKey)
+		blockChains = append(blockChains, dbTransaction.Blockchains)
+		messageTypes = append(messageTypes, dbTransaction.MessageType)
+		heights = append(heights, int64(dbTransaction.Height))
+		indexes = append(indexes, int64(dbTransaction.Index))
+		stdTxs = append(stdTxs, dbTransaction.StdTx)
+		txResults = append(txResults, dbTransaction.TxResult)
+		txStrings = append(txStrings, dbTransaction.Tx)
+		entropies = append(entropies, int64(dbTransaction.Entropy))
+		fees = append(fees, int64(dbTransaction.Fee))
+		feeDenominations = append(feeDenominations, dbTransaction.FeeDenomination)
+		amounts = append(amounts, int64(dbTransaction.Amount))
 	}
 
-	_, err := d.NamedExec(insertTransactionsScript, transactions)
+	_, err := d.Exec(insertTransactionsScript,
+		pq.StringArray(hashes),
+		pq.Array(fromAddresses),
+		pq.Array(toAddresses),
+		pq.StringArray(appPubKeys),
+		pq.StringArray(blockChains),
+		pq.StringArray(messageTypes),
+		pq.Int64Array(heights),
+		pq.Int64Array(indexes),
+		pq.Array(stdTxs),
+		pq.Array(txResults),
+		pq.StringArray(txStrings),
+		pq.Int64Array(entropies),
+		pq.Int64Array(fees),
+		pq.StringArray(feeDenominations),
+		pq.Int64Array(amounts))
 	if err != nil {
 		return err
 	}
@@ -725,13 +769,26 @@ func convertIndexerNodeToDBNode(indexerNode *indexer.Node) *dbNode {
 
 // WriteNodes inserts given nodes to the database
 func (d *PostgresDriver) WriteNodes(nodes []*indexer.Node) error {
-	var dbNodes []*dbNode
+	var addresses, publicKeys, serviceURLs, allTokens []string
+	var heights []int64
+	var jaileds []bool
 
 	for _, node := range nodes {
-		dbNodes = append(dbNodes, convertIndexerNodeToDBNode(node))
+		dbNode := convertIndexerNodeToDBNode(node)
+		addresses = append(addresses, dbNode.Address)
+		heights = append(heights, int64(dbNode.Height))
+		jaileds = append(jaileds, dbNode.Jailed)
+		publicKeys = append(publicKeys, dbNode.PublicKey)
+		serviceURLs = append(serviceURLs, dbNode.ServiceURL)
+		allTokens = append(allTokens, dbNode.Tokens)
 	}
 
-	_, err := d.NamedExec(insertNodesScript, dbNodes)
+	_, err := d.Exec(insertNodesScript, pq.StringArray(addresses),
+		pq.Int64Array(heights),
+		pq.BoolArray(jaileds),
+		pq.StringArray(publicKeys),
+		pq.StringArray(serviceURLs),
+		pq.StringArray(allTokens))
 	if err != nil {
 		return err
 	}
@@ -851,13 +908,24 @@ func convertIndexerAppToDBApp(indexerApp *indexer.App) *dbApp {
 
 // WriteApps inserts given apps to the database
 func (d *PostgresDriver) WriteApps(apps []*indexer.App) error {
-	var dbApps []*dbApp
+	var addresses, publicKeys, allStakedTokens []string
+	var heights []int64
+	var jaileds []bool
 
 	for _, app := range apps {
-		dbApps = append(dbApps, convertIndexerAppToDBApp(app))
+		dbApp := convertIndexerAppToDBApp(app)
+		addresses = append(addresses, dbApp.Address)
+		heights = append(heights, int64(dbApp.Height))
+		jaileds = append(jaileds, dbApp.Jailed)
+		publicKeys = append(publicKeys, dbApp.PublicKey)
+		allStakedTokens = append(allStakedTokens, dbApp.StakedTokens)
 	}
 
-	_, err := d.NamedExec(insertAppsScript, dbApps)
+	_, err := d.Exec(insertAppsScript, pq.StringArray(addresses),
+		pq.Int64Array(heights),
+		pq.BoolArray(jaileds),
+		pq.StringArray(publicKeys),
+		pq.StringArray(allStakedTokens))
 	if err != nil {
 		return err
 	}
