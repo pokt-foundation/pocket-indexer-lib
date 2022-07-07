@@ -57,14 +57,14 @@ func TestPostgresDriver_WriteTransactions(t *testing.T) {
 		pq.StringArray([]string{"addssd"}), pq.Array([]sql.NullString{{}}), pq.StringArray([]string{"adasdsfd"}), pq.StringArray([]string{"0021"}),
 		pq.StringArray([]string{"pos/Send"}), pq.Int64Array([]int64{0}), pq.Int64Array([]int64{0}), pq.Array([]driver.Value{encodedTestStdTx}),
 		pq.Array([]driver.Value{"{}"}), pq.StringArray([]string{""}), pq.Int64Array([]int64{3223323}), pq.Int64Array([]int64{10000}),
-		pq.StringArray([]string{"upokt"}), pq.Int64Array([]int64{462000000})).
+		pq.StringArray([]string{"upokt"}), pq.StringArray([]string{"462000000"})).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	mock.ExpectExec("INSERT into transactions").WithArgs(pq.StringArray([]string{"AF5BB3EAFF431E2E5E784D639825979FF20A779725BFE61D4521340F70C3996D0"}),
 		pq.StringArray([]string{"addssd"}), pq.Array([]sql.NullString{{}}), pq.StringArray([]string{"adasdsfd"}), pq.StringArray([]string{"0021"}),
 		pq.StringArray([]string{"pos/Send"}), pq.Int64Array([]int64{0}), pq.Int64Array([]int64{0}), pq.Array([]driver.Value{encodedTestStdTx}),
 		pq.Array([]driver.Value{"{}"}), pq.StringArray([]string{""}), pq.Int64Array([]int64{3223323}), pq.Int64Array([]int64{10000}),
-		pq.StringArray([]string{"upokt"}), pq.Int64Array([]int64{462000000})).
+		pq.StringArray([]string{"upokt"}), pq.StringArray([]string{"462000000"})).
 		WillReturnError(errors.New("dummy error"))
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
@@ -80,7 +80,7 @@ func TestPostgresDriver_WriteTransactions(t *testing.T) {
 			Entropy:         3223323,
 			Fee:             10000,
 			FeeDenomination: "upokt",
-			Amount:          462000000,
+			Amount:          big.NewInt(462000000),
 			StdTx:           testProvStdTx,
 		},
 	}
