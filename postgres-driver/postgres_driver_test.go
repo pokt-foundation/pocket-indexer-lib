@@ -463,9 +463,24 @@ func TestPostgresDriver_ReadBlockByHeight(t *testing.T) {
 	c.NoError(err)
 	c.NotEmpty(block)
 
+	rows = sqlmock.NewRows([]string{"id", "hash", "height", "time", "proposer_address", "tx_count"}).
+		AddRow(1, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21)
+
+	mock.ExpectQuery("^SELECT (.+) FROM blocks (.+)").WillReturnRows(rows)
+
+	block, err = driver.ReadBlockByHeight(0)
+	c.NoError(err)
+	c.NotEmpty(block)
+
 	mock.ExpectQuery("^SELECT (.+) FROM blocks (.+)").WillReturnError(errors.New("dummy error"))
 
 	block, err = driver.ReadBlockByHeight(21)
+	c.EqualError(err, "dummy error")
+	c.Empty(block)
+
+	mock.ExpectQuery("^SELECT (.+) FROM blocks (.+)").WillReturnError(errors.New("dummy error"))
+
+	block, err = driver.ReadBlockByHeight(0)
 	c.EqualError(err, "dummy error")
 	c.Empty(block)
 }
@@ -563,7 +578,7 @@ func TestPostgresDriver_WriteAccount(t *testing.T) {
 	c.EqualError(err, "dummy error")
 }
 
-func TestPostgresDriver_ReadAccountByAddressAndHeight(t *testing.T) {
+func TestPostgresDriver_ReadAccountByAddress(t *testing.T) {
 	c := require.New(t)
 
 	db, mock, err := sqlmock.New()
@@ -578,22 +593,37 @@ func TestPostgresDriver_ReadAccountByAddressAndHeight(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	account, err := driver.ReadAccountByAddressAndHeight("00353abd21ef72725b295ba5a9a5eb6082548e2", 21)
+	account, err := driver.ReadAccountByAddress("00353abd21ef72725b295ba5a9a5eb6082548e2", &ReadAccountByAddressOptions{Height: 21})
 	c.Equal(ErrInvalidAddress, err)
 	c.Empty(account)
 
-	account, err = driver.ReadAccountByAddressAndHeight("00353abd21ef72725b295ba5a9a5eb6082548e21", 21)
+	account, err = driver.ReadAccountByAddress("00353abd21ef72725b295ba5a9a5eb6082548e21", &ReadAccountByAddressOptions{Height: 21})
+	c.NoError(err)
+	c.NotEmpty(account)
+
+	rows = sqlmock.NewRows([]string{"id", "address", "height", "balance", "balance_denomination"}).
+		AddRow(1, "00353abd21ef72725b295ba5a9a5eb6082548e21", 21, "212121", "upokt")
+
+	mock.ExpectQuery("^SELECT (.+) FROM accounts (.+)").WillReturnRows(rows)
+
+	account, err = driver.ReadAccountByAddress("00353abd21ef72725b295ba5a9a5eb6082548e21", nil)
 	c.NoError(err)
 	c.NotEmpty(account)
 
 	mock.ExpectQuery("^SELECT (.+) FROM accounts (.+)").WillReturnError(errors.New("dummy error"))
 
-	account, err = driver.ReadAccountByAddressAndHeight("00353abd21ef72725b295ba5a9a5eb6082548e21", 21)
+	account, err = driver.ReadAccountByAddress("00353abd21ef72725b295ba5a9a5eb6082548e21", &ReadAccountByAddressOptions{Height: 21})
+	c.EqualError(err, "dummy error")
+	c.Empty(account)
+
+	mock.ExpectQuery("^SELECT (.+) FROM accounts (.+)").WillReturnError(errors.New("dummy error"))
+
+	account, err = driver.ReadAccountByAddress("00353abd21ef72725b295ba5a9a5eb6082548e21", nil)
 	c.EqualError(err, "dummy error")
 	c.Empty(account)
 }
 
-func TestPostgresDriver_ReadAccountsByHeight(t *testing.T) {
+func TestPostgresDriver_ReadAccounts(t *testing.T) {
 	c := require.New(t)
 
 	db, mock, err := sqlmock.New()
@@ -611,7 +641,7 @@ func TestPostgresDriver_ReadAccountsByHeight(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	accounts, err := driver.ReadAccountsByHeight(21, &ReadAccountsByHeightOptions{Page: 21, PerPage: 7})
+	accounts, err := driver.ReadAccounts(&ReadAccountsOptions{Page: 21, PerPage: 7, Height: 21})
 	c.NoError(err)
 	c.Len(accounts, 2)
 
@@ -619,12 +649,12 @@ func TestPostgresDriver_ReadAccountsByHeight(t *testing.T) {
 	mock.ExpectQuery(".*").WillReturnError(errors.New("dummy error"))
 	mock.ExpectCommit()
 
-	accounts, err = driver.ReadAccountsByHeight(21, &ReadAccountsByHeightOptions{})
+	accounts, err = driver.ReadAccounts(&ReadAccountsOptions{})
 	c.EqualError(err, "dummy error")
 	c.Empty(accounts)
 }
 
-func TestPostgresDriver_GetAccountsQuantityByHeight(t *testing.T) {
+func TestPostgresDriver_GetAccountsQuantity(t *testing.T) {
 	c := require.New(t)
 
 	db, mock, err := sqlmock.New()
@@ -638,13 +668,13 @@ func TestPostgresDriver_GetAccountsQuantityByHeight(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	maxHeight, err := driver.GetAccountsQuantityByHeight(21)
+	maxHeight, err := driver.GetAccountsQuantity(&GetAccountsQuantityOptions{Height: 21})
 	c.NoError(err)
 	c.Equal(int64(100), maxHeight)
 
 	mock.ExpectQuery("^SELECT (.+) FROM accounts").WillReturnError(errors.New("dummy error"))
 
-	maxHeight, err = driver.GetAccountsQuantityByHeight(21)
+	maxHeight, err = driver.GetAccountsQuantity(nil)
 	c.EqualError(err, "dummy error")
 	c.Empty(maxHeight)
 }
@@ -687,7 +717,7 @@ func TestPostgresDriver_WriteNodes(t *testing.T) {
 	c.EqualError(err, "dummy error")
 }
 
-func TestPostgresDriver_ReadNodeByAddressAndHeight(t *testing.T) {
+func TestPostgresDriver_ReadNodeByAddress(t *testing.T) {
 	c := require.New(t)
 
 	db, mock, err := sqlmock.New()
@@ -703,22 +733,38 @@ func TestPostgresDriver_ReadNodeByAddressAndHeight(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	node, err := driver.ReadNodeByAddressAndHeight("00353abd21ef72725b295ba5a9a5eb6082548e2", 21)
+	node, err := driver.ReadNodeByAddress("00353abd21ef72725b295ba5a9a5eb6082548e2", &ReadNodeByAddressOptions{Height: 21})
 	c.Equal(ErrInvalidAddress, err)
 	c.Empty(node)
 
-	node, err = driver.ReadNodeByAddressAndHeight("00353abd21ef72725b295ba5a9a5eb6082548e21", 21)
+	node, err = driver.ReadNodeByAddress("00353abd21ef72725b295ba5a9a5eb6082548e21", &ReadNodeByAddressOptions{Height: 21})
+	c.NoError(err)
+	c.NotEmpty(node)
+
+	rows = sqlmock.NewRows([]string{"id", "address", "height", "jailed", "public_key", "service_url", "tokens"}).
+		AddRow(1, "00353abd21ef72725b295ba5a9a5eb6082548e21", 21, false,
+			"01473af96ffc54c447f79d2fa06ee79e68c0dbd5b8257da25bf99dd89309c903", "https://dummy.com:6045", "212121")
+
+	mock.ExpectQuery("^SELECT (.+) FROM nodes (.+)").WillReturnRows(rows)
+
+	node, err = driver.ReadNodeByAddress("00353abd21ef72725b295ba5a9a5eb6082548e21", nil)
 	c.NoError(err)
 	c.NotEmpty(node)
 
 	mock.ExpectQuery("^SELECT (.+) FROM nodes (.+)").WillReturnError(errors.New("dummy error"))
 
-	node, err = driver.ReadNodeByAddressAndHeight("00353abd21ef72725b295ba5a9a5eb6082548e21", 21)
+	node, err = driver.ReadNodeByAddress("00353abd21ef72725b295ba5a9a5eb6082548e21", &ReadNodeByAddressOptions{Height: 21})
+	c.EqualError(err, "dummy error")
+	c.Empty(node)
+
+	mock.ExpectQuery("^SELECT (.+) FROM nodes (.+)").WillReturnError(errors.New("dummy error"))
+
+	node, err = driver.ReadNodeByAddress("00353abd21ef72725b295ba5a9a5eb6082548e21", nil)
 	c.EqualError(err, "dummy error")
 	c.Empty(node)
 }
 
-func TestPostgresDriver_ReadNodesByHeight(t *testing.T) {
+func TestPostgresDriver_ReadNodes(t *testing.T) {
 	c := require.New(t)
 
 	db, mock, err := sqlmock.New()
@@ -738,7 +784,7 @@ func TestPostgresDriver_ReadNodesByHeight(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	nodes, err := driver.ReadNodesByHeight(21, &ReadNodesByHeightOptions{Page: 21, PerPage: 7})
+	nodes, err := driver.ReadNodes(&ReadNodesOptions{Page: 21, PerPage: 7, Height: 21})
 	c.NoError(err)
 	c.Len(nodes, 2)
 
@@ -746,12 +792,12 @@ func TestPostgresDriver_ReadNodesByHeight(t *testing.T) {
 	mock.ExpectQuery(".*").WillReturnError(errors.New("dummy error"))
 	mock.ExpectCommit()
 
-	nodes, err = driver.ReadNodesByHeight(21, &ReadNodesByHeightOptions{})
+	nodes, err = driver.ReadNodes(&ReadNodesOptions{})
 	c.EqualError(err, "dummy error")
 	c.Empty(nodes)
 }
 
-func TestPostgresDriver_GetNodesQuantityByHeight(t *testing.T) {
+func TestPostgresDriver_GetNodesQuantity(t *testing.T) {
 	c := require.New(t)
 
 	db, mock, err := sqlmock.New()
@@ -765,13 +811,13 @@ func TestPostgresDriver_GetNodesQuantityByHeight(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	maxHeight, err := driver.GetNodesQuantityByHeight(21)
+	maxHeight, err := driver.GetNodesQuantity(&GetNodesQuantityOptions{Height: 21})
 	c.NoError(err)
 	c.Equal(int64(100), maxHeight)
 
 	mock.ExpectQuery("^SELECT (.+) FROM nodes").WillReturnError(errors.New("dummy error"))
 
-	maxHeight, err = driver.GetNodesQuantityByHeight(21)
+	maxHeight, err = driver.GetNodesQuantity(nil)
 	c.EqualError(err, "dummy error")
 	c.Empty(maxHeight)
 }
@@ -813,7 +859,7 @@ func TestPostgresDriver_WriteApps(t *testing.T) {
 	c.EqualError(err, "dummy error")
 }
 
-func TestPostgresDriver_ReadAppByAddressAndHeight(t *testing.T) {
+func TestPostgresDriver_ReadAppByAddress(t *testing.T) {
 	c := require.New(t)
 
 	db, mock, err := sqlmock.New()
@@ -829,22 +875,38 @@ func TestPostgresDriver_ReadAppByAddressAndHeight(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	app, err := driver.ReadAppByAddressAndHeight("00353abd21ef72725b295ba5a9a5eb6082548e2", 21)
+	app, err := driver.ReadAppByAddress("00353abd21ef72725b295ba5a9a5eb6082548e2", &ReadAppByAddressOptions{Height: 21})
 	c.Equal(ErrInvalidAddress, err)
 	c.Empty(app)
 
-	app, err = driver.ReadAppByAddressAndHeight("00353abd21ef72725b295ba5a9a5eb6082548e21", 21)
+	app, err = driver.ReadAppByAddress("00353abd21ef72725b295ba5a9a5eb6082548e21", &ReadAppByAddressOptions{Height: 21})
+	c.NoError(err)
+	c.NotEmpty(app)
+
+	rows = sqlmock.NewRows([]string{"id", "address", "height", "jailed", "public_key", "staked_tokens"}).
+		AddRow(1, "00353abd21ef72725b295ba5a9a5eb6082548e21", 21, false,
+			"01473af96ffc54c447f79d2fa06ee79e68c0dbd5b8257da25bf99dd89309c903", "212121")
+
+	mock.ExpectQuery("^SELECT (.+) FROM apps (.+)").WillReturnRows(rows)
+
+	app, err = driver.ReadAppByAddress("00353abd21ef72725b295ba5a9a5eb6082548e21", nil)
 	c.NoError(err)
 	c.NotEmpty(app)
 
 	mock.ExpectQuery("^SELECT (.+) FROM apps (.+)").WillReturnError(errors.New("dummy error"))
 
-	app, err = driver.ReadAppByAddressAndHeight("00353abd21ef72725b295ba5a9a5eb6082548e21", 21)
+	app, err = driver.ReadAppByAddress("00353abd21ef72725b295ba5a9a5eb6082548e21", &ReadAppByAddressOptions{Height: 21})
+	c.EqualError(err, "dummy error")
+	c.Empty(app)
+
+	mock.ExpectQuery("^SELECT (.+) FROM apps (.+)").WillReturnError(errors.New("dummy error"))
+
+	app, err = driver.ReadAppByAddress("00353abd21ef72725b295ba5a9a5eb6082548e21", nil)
 	c.EqualError(err, "dummy error")
 	c.Empty(app)
 }
 
-func TestPostgresDriver_ReadAppsByHeight(t *testing.T) {
+func TestPostgresDriver_ReadApps(t *testing.T) {
 	c := require.New(t)
 
 	db, mock, err := sqlmock.New()
@@ -864,7 +926,7 @@ func TestPostgresDriver_ReadAppsByHeight(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	apps, err := driver.ReadAppsByHeight(21, &ReadAppsByHeightOptions{Page: 21, PerPage: 7})
+	apps, err := driver.ReadApps(&ReadAppsOptions{Page: 21, PerPage: 7, Height: 21})
 	c.NoError(err)
 	c.Len(apps, 2)
 
@@ -872,12 +934,12 @@ func TestPostgresDriver_ReadAppsByHeight(t *testing.T) {
 	mock.ExpectQuery(".*").WillReturnError(errors.New("dummy error"))
 	mock.ExpectCommit()
 
-	apps, err = driver.ReadAppsByHeight(21, &ReadAppsByHeightOptions{})
+	apps, err = driver.ReadApps(&ReadAppsOptions{})
 	c.EqualError(err, "dummy error")
 	c.Empty(apps)
 }
 
-func TestPostgresDriver_GetAppsQuantityByHeight(t *testing.T) {
+func TestPostgresDriver_GetAppsQuantity(t *testing.T) {
 	c := require.New(t)
 
 	db, mock, err := sqlmock.New()
@@ -891,13 +953,13 @@ func TestPostgresDriver_GetAppsQuantityByHeight(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	maxHeight, err := driver.GetAppsQuantityByHeight(21)
+	maxHeight, err := driver.GetAppsQuantity(&GetAppsQuantityOptions{Height: 21})
 	c.NoError(err)
 	c.Equal(int64(100), maxHeight)
 
 	mock.ExpectQuery("^SELECT (.+) FROM apps").WillReturnError(errors.New("dummy error"))
 
-	maxHeight, err = driver.GetAppsQuantityByHeight(21)
+	maxHeight, err = driver.GetAppsQuantity(nil)
 	c.EqualError(err, "dummy error")
 	c.Empty(maxHeight)
 }
