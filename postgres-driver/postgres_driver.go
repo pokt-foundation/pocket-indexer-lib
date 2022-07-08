@@ -46,6 +46,21 @@ const (
 	MOVE absolute %d from blocks_cursor;
 	FETCH %d FROM blocks_cursor;
 	`
+	selectAccountsScript = `
+	DECLARE accounts_cursor CURSOR FOR SELECT * FROM accounts WHERE height = (SELECT MAX(height) FROM accounts);
+	MOVE absolute %d from accounts_cursor;
+	FETCH %d FROM accounts_cursor;
+	`
+	selectNodesScript = `
+	DECLARE nodes_cursor CURSOR FOR SELECT * FROM nodes WHERE height = (SELECT MAX(height) FROM nodes);
+	MOVE absolute %d from nodes_cursor;
+	FETCH %d FROM nodes_cursor;
+	`
+	selectAppsScript = `
+	DECLARE apps_cursor CURSOR FOR SELECT * FROM apps WHERE height = (SELECT MAX(height) FROM apps);
+	MOVE absolute %d from apps_cursor;
+	FETCH %d FROM apps_cursor;
+	`
 	selectTransactionsByAddressScript = `
 	DECLARE transactions_cursor CURSOR FOR SELECT * FROM transactions WHERE from_address = '%s' OR to_address = '%s' ORDER BY height DESC;
 	MOVE absolute %d from transactions_cursor;
@@ -55,6 +70,11 @@ const (
 	selectBlockByHashScript          = "SELECT * FROM blocks WHERE hash = $1"
 	selectTransactionsByHeightScript = `
 	DECLARE transactions_cursor CURSOR FOR SELECT * FROM transactions WHERE height = '%d';
+	MOVE absolute %d from transactions_cursor;
+	FETCH %d FROM transactions_cursor;
+	`
+	selectTransactionsByMaxHeightScript = `
+	DECLARE transactions_cursor CURSOR FOR SELECT * FROM transactions WHERE height = (SELECT MAX(height) FROM transactions);
 	MOVE absolute %d from transactions_cursor;
 	FETCH %d FROM transactions_cursor;
 	`
@@ -73,18 +93,26 @@ const (
 	MOVE absolute %d from apps_cursor;
 	FETCH %d FROM apps_cursor;
 	`
-	selectBlockByHeightScript             = "SELECT * FROM blocks WHERE height = $1"
-	selectAccountByAddressAndHeightScript = "SELECT * FROM accounts WHERE address = $1 AND height = $2"
-	selectNodeByAddressAndHeightScript    = "SELECT * FROM nodes WHERE address = $1 AND height = $2"
-	selectAppByAddressAndHeightScript     = "SELECT * FROM apps WHERE address = $1 AND height = $2"
-	selectCountFromTransactions           = "SELECT COUNT(*) FROM transactions"
-	selectCountFromBlocks                 = "SELECT COUNT(*) FROM blocks"
-	selectCountFromTransactionsByAddress  = "SELECT COUNT(*) FROM transactions WHERE from_address = $1 OR to_address = $1"
-	selectCountFromTransactionsByHeight   = "SELECT COUNT(*) FROM transactions WHERE height = $1"
-	selectCountFromAccountsByHeight       = "SELECT COUNT(*) FROM accounts WHERE height = $1"
-	selectCountFromNodesByHeight          = "SELECT COUNT(*) FROM nodes WHERE height = $1"
-	selectCountFromAppsByHeight           = "SELECT COUNT(*) FROM apps WHERE height = $1"
-	selectMaxHeightFromBlocks             = "SELECT MAX(height) FROM blocks"
+	selectBlockByHeightScript              = "SELECT * FROM blocks WHERE height = $1"
+	selectBlockByMaxHeightScript           = "SELECT * FROM blocks WHERE height = (SELECT MAX(height) FROM blocks)"
+	selectAccountByAddressScript           = "SELECT * FROM accounts WHERE address = $1 AND height = (SELECT MAX(height) FROM accounts)"
+	selectNodeByAddressScript              = "SELECT * FROM nodes WHERE address = $1 AND height = (SELECT MAX(height) FROM nodes)"
+	selectAppByAddressScript               = "SELECT * FROM apps WHERE address = $1 AND height = (SELECT MAX(height) FROM apps)"
+	selectAccountByAddressAndHeightScript  = "SELECT * FROM accounts WHERE address = $1 AND height = $2"
+	selectNodeByAddressAndHeightScript     = "SELECT * FROM nodes WHERE address = $1 AND height = $2"
+	selectAppByAddressAndHeightScript      = "SELECT * FROM apps WHERE address = $1 AND height = $2"
+	selectCountFromTransactions            = "SELECT COUNT(*) FROM transactions"
+	selectCountFromBlocks                  = "SELECT COUNT(*) FROM blocks"
+	selectCountFromTransactionsByAddress   = "SELECT COUNT(*) FROM transactions WHERE from_address = $1 OR to_address = $1"
+	selectCountFromTransactionsByHeight    = "SELECT COUNT(*) FROM transactions WHERE height = $1"
+	selectCountFromTransactionsByMaxHeight = "SELECT COUNT(*) FROM transactions WHERE height = (SELECT MAX(height) FROM transactions)"
+	selectCountFromAccounts                = "SELECT COUNT(*) FROM accounts WHERE height = (SELECT MAX(height) FROM accounts)"
+	selectCountFromNodes                   = "SELECT COUNT(*) FROM nodes WHERE height = (SELECT MAX(height) FROM nodes)"
+	selectCountFromApps                    = "SELECT COUNT(*) FROM apps WHERE height = (SELECT MAX(height) FROM apps)"
+	selectCountFromAccountsByHeight        = "SELECT COUNT(*) FROM accounts WHERE height = $1"
+	selectCountFromNodesByHeight           = "SELECT COUNT(*) FROM nodes WHERE height = $1"
+	selectCountFromAppsByHeight            = "SELECT COUNT(*) FROM apps WHERE height = $1"
+	selectMaxHeightFromBlocks              = "SELECT MAX(height) FROM blocks"
 
 	defaultPerPage = 1000
 	defaultPage    = 1
@@ -142,6 +170,22 @@ func getPageValue(optionsPage int) int {
 
 func getMoveValue(perPage, page int) int {
 	return (page - 1) * perPage
+}
+
+func getHeightOptionalQuery(queryWithHeight, queryWithoutHeight string, height, move, perPage int) string {
+	if height == 0 {
+		return fmt.Sprintf(queryWithoutHeight, move, perPage)
+	}
+
+	return fmt.Sprintf(queryWithHeight, height, move, perPage)
+}
+
+func (d *PostgresDriver) getRowWithOptionalHeight(queryWithHeight, queryWithoutHeight string, height int) *sql.Row {
+	if height == 0 {
+		return d.QueryRow(queryWithoutHeight)
+	}
+
+	return d.QueryRow(queryWithHeight, height)
 }
 
 // dbTransaction is struct handler for the transaction with types needed for Postgres processing
@@ -374,6 +418,7 @@ type ReadTransactionsByHeightOptions struct {
 }
 
 // ReadTransactionsByHeight returns transactions with given height
+// height 0 is last height
 // Optional values defaults: page: 1, perPage: 1000
 func (d *PostgresDriver) ReadTransactionsByHeight(height int, options *ReadTransactionsByHeightOptions) ([]*indexer.Transaction, error) {
 	perPage := defaultPerPage
@@ -391,7 +436,8 @@ func (d *PostgresDriver) ReadTransactionsByHeight(height int, options *ReadTrans
 		return nil, err
 	}
 
-	query := fmt.Sprintf(selectTransactionsByHeightScript, height, move, perPage)
+	query := getHeightOptionalQuery(selectTransactionsByHeightScript, selectTransactionsByMaxHeightScript,
+		height, move, perPage)
 
 	var transactions []*dbTransaction
 
@@ -459,8 +505,10 @@ func (d *PostgresDriver) GetTransactionsQuantityByAddress(address string) (int64
 }
 
 // GetTransactionsQuantityByHeight returns quantity of transactions with given height saved
+// height 0 is last height
 func (d *PostgresDriver) GetTransactionsQuantityByHeight(height int) (int64, error) {
-	row := d.QueryRow(selectCountFromTransactionsByHeight, height)
+	row := d.getRowWithOptionalHeight(selectCountFromTransactionsByHeight,
+		selectCountFromTransactionsByMaxHeight, height)
 
 	var quantity int64
 
@@ -574,12 +622,20 @@ func (d *PostgresDriver) ReadBlockByHash(hash string) (*indexer.Block, error) {
 }
 
 // ReadBlockByHeight returns block in the database with given height
+// height 0 is last height
 func (d *PostgresDriver) ReadBlockByHeight(height int) (*indexer.Block, error) {
 	var dbBlock dbBlock
 
-	err := d.Get(&dbBlock, selectBlockByHeightScript, height)
-	if err != nil {
-		return nil, err
+	if height == 0 {
+		err := d.Get(&dbBlock, selectBlockByMaxHeightScript)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		err := d.Get(&dbBlock, selectBlockByHeightScript, height)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return dbBlock.toIndexerBlock(), nil
@@ -657,37 +713,57 @@ func (d *PostgresDriver) WriteAccount(account *indexer.Account) error {
 	return nil
 }
 
-// ReadAccountByAddressAndHeight returns an account in the database with given address and height
-func (d *PostgresDriver) ReadAccountByAddressAndHeight(address string, height int) (*indexer.Account, error) {
+// ReadAccountByAddressOptions optional parameters for ReadAccountByAddress
+type ReadAccountByAddressOptions struct {
+	Height int
+}
+
+// ReadAccountByAddress returns an account in the database with given address
+func (d *PostgresDriver) ReadAccountByAddress(address string, options *ReadAccountByAddressOptions) (*indexer.Account, error) {
 	if !utils.ValidateAddress(address) {
 		return nil, ErrInvalidAddress
 	}
 
 	var dbAccount dbAccount
+	var height int
 
-	err := d.Get(&dbAccount, selectAccountByAddressAndHeightScript, address, height)
-	if err != nil {
-		return nil, err
+	if options != nil {
+		height = options.Height
+	}
+
+	if height == 0 {
+		err := d.Get(&dbAccount, selectAccountByAddressScript, address)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		err := d.Get(&dbAccount, selectAccountByAddressAndHeightScript, address, height)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return dbAccount.toIndexerAccount(), nil
 }
 
-// ReadAccountsByHeightOptions optional parameters for ReadAccountsByHeight
-type ReadAccountsByHeightOptions struct {
+// ReadAccountsOptions optional parameters for ReadAccounts
+type ReadAccountsOptions struct {
 	PerPage int
 	Page    int
+	Height  int
 }
 
-// ReadAccountsByHeight returns accounts with given height
-// Optional values defaults: page: 1, perPage: 1000
-func (d *PostgresDriver) ReadAccountsByHeight(height int, options *ReadAccountsByHeightOptions) ([]*indexer.Account, error) {
+// ReadAccounts returns accounts with given height
+// Optional values defaults: page: 1, perPage: 1000, height: last height
+func (d *PostgresDriver) ReadAccounts(options *ReadAccountsOptions) ([]*indexer.Account, error) {
 	perPage := defaultPerPage
 	page := defaultPage
+	height := 0
 
 	if options != nil {
 		perPage = getPerPageValue(options.PerPage)
 		page = getPageValue(options.Page)
+		height = options.Height
 	}
 
 	move := getMoveValue(perPage, page)
@@ -697,7 +773,8 @@ func (d *PostgresDriver) ReadAccountsByHeight(height int, options *ReadAccountsB
 		return nil, err
 	}
 
-	query := fmt.Sprintf(selectAccountsByHeightScript, height, move, perPage)
+	query := getHeightOptionalQuery(selectAccountsByHeightScript, selectAccountsScript,
+		height, move, perPage)
 
 	var accounts []*dbAccount
 
@@ -720,9 +797,21 @@ func (d *PostgresDriver) ReadAccountsByHeight(height int, options *ReadAccountsB
 	return indexerAccounts, nil
 }
 
-// GetAccountsQuantityByHeight returns quantity of accounts with given height saved
-func (d *PostgresDriver) GetAccountsQuantityByHeight(height int) (int64, error) {
-	row := d.QueryRow(selectCountFromAccountsByHeight, height)
+// GetAccountsQuantityOptions optional parameters for GetAccountsQuantity
+type GetAccountsQuantityOptions struct {
+	Height int
+}
+
+// GetAccountsQuantity returns quantity of accounts with given height saved
+// default height is last height
+func (d *PostgresDriver) GetAccountsQuantity(options *GetAccountsQuantityOptions) (int64, error) {
+	var height int
+
+	if options != nil {
+		height = options.Height
+	}
+
+	row := d.getRowWithOptionalHeight(selectCountFromAccountsByHeight, selectCountFromAccounts, height)
 
 	var quantity int64
 
@@ -799,37 +888,57 @@ func (d *PostgresDriver) WriteNodes(nodes []*indexer.Node) error {
 	return nil
 }
 
-// ReadNodeByAddressAndHeight returns a node in the database with given address and height
-func (d *PostgresDriver) ReadNodeByAddressAndHeight(address string, height int) (*indexer.Node, error) {
+// ReadNodeByAddressOptions optional parameters for ReadNodeByAddress
+type ReadNodeByAddressOptions struct {
+	Height int
+}
+
+// ReadNodeByAddress returns a node in the database with given address
+func (d *PostgresDriver) ReadNodeByAddress(address string, options *ReadNodeByAddressOptions) (*indexer.Node, error) {
 	if !utils.ValidateAddress(address) {
 		return nil, ErrInvalidAddress
 	}
 
 	var dbNode dbNode
+	var height int
 
-	err := d.Get(&dbNode, selectNodeByAddressAndHeightScript, address, height)
-	if err != nil {
-		return nil, err
+	if options != nil {
+		height = options.Height
+	}
+
+	if height == 0 {
+		err := d.Get(&dbNode, selectNodeByAddressScript, address)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		err := d.Get(&dbNode, selectNodeByAddressAndHeightScript, address, height)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return dbNode.toIndexerNode(), nil
 }
 
-// ReadNodesByHeightOptions optional parameters for ReadNodesByHeight
-type ReadNodesByHeightOptions struct {
+// ReadNodesOptions optional parameters for ReadNodes
+type ReadNodesOptions struct {
 	PerPage int
 	Page    int
+	Height  int
 }
 
-// ReadNodesByHeight returns nodes with given height
-// Optional values defaults: page: 1, perPage: 1000
-func (d *PostgresDriver) ReadNodesByHeight(height int, options *ReadNodesByHeightOptions) ([]*indexer.Node, error) {
+// ReadNodes returns nodes with given height
+// Optional values defaults: page: 1, perPage: 1000, height: last height
+func (d *PostgresDriver) ReadNodes(options *ReadNodesOptions) ([]*indexer.Node, error) {
 	perPage := defaultPerPage
 	page := defaultPage
+	height := 0
 
 	if options != nil {
 		perPage = getPerPageValue(options.PerPage)
 		page = getPageValue(options.Page)
+		height = options.Height
 	}
 
 	move := getMoveValue(perPage, page)
@@ -839,7 +948,8 @@ func (d *PostgresDriver) ReadNodesByHeight(height int, options *ReadNodesByHeigh
 		return nil, err
 	}
 
-	query := fmt.Sprintf(selectNodesByHeightScript, height, move, perPage)
+	query := getHeightOptionalQuery(selectNodesByHeightScript, selectNodesScript,
+		height, move, perPage)
 
 	var nodes []*dbNode
 
@@ -862,9 +972,21 @@ func (d *PostgresDriver) ReadNodesByHeight(height int, options *ReadNodesByHeigh
 	return indexerNodes, nil
 }
 
-// GetNodesQuantityByHeight returns quantity of nodes with given height saved
-func (d *PostgresDriver) GetNodesQuantityByHeight(height int) (int64, error) {
-	row := d.QueryRow(selectCountFromNodesByHeight, height)
+// GetNodesQuantityOptions optinal params for GetNodesQuantity
+type GetNodesQuantityOptions struct {
+	Height int
+}
+
+// GetNodesQuantity returns quantity of nodes with given height saved
+// default height is last height
+func (d *PostgresDriver) GetNodesQuantity(options *GetNodesQuantityOptions) (int64, error) {
+	var height int
+
+	if options != nil {
+		height = options.Height
+	}
+
+	row := d.getRowWithOptionalHeight(selectCountFromNodesByHeight, selectCountFromNodes, height)
 
 	var quantity int64
 
@@ -936,37 +1058,57 @@ func (d *PostgresDriver) WriteApps(apps []*indexer.App) error {
 	return nil
 }
 
-// ReadAppByAddressAndHeight returns an app in the database with given address and height
-func (d *PostgresDriver) ReadAppByAddressAndHeight(address string, height int) (*indexer.App, error) {
+// ReadAppByAddressOptions optional parameters for ReadAppByAddress
+type ReadAppByAddressOptions struct {
+	Height int
+}
+
+// ReadAppByAddress returns an app in the database with given address
+func (d *PostgresDriver) ReadAppByAddress(address string, options *ReadAppByAddressOptions) (*indexer.App, error) {
 	if !utils.ValidateAddress(address) {
 		return nil, ErrInvalidAddress
 	}
 
 	var dbApp dbApp
+	var height int
 
-	err := d.Get(&dbApp, selectAppByAddressAndHeightScript, address, height)
-	if err != nil {
-		return nil, err
+	if options != nil {
+		height = options.Height
+	}
+
+	if height == 0 {
+		err := d.Get(&dbApp, selectAppByAddressScript, address)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		err := d.Get(&dbApp, selectAppByAddressAndHeightScript, address, height)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return dbApp.toIndexerApp(), nil
 }
 
-// ReadAppsByHeightOptions optional parameters for ReadAppsByHeight
-type ReadAppsByHeightOptions struct {
+// ReadAppsOptions optional parameters for ReadApps
+type ReadAppsOptions struct {
 	PerPage int
 	Page    int
+	Height  int
 }
 
-// ReadAppsByHeight returns apps with given height
+// ReadApps returns apps with given height
 // Optional values defaults: page: 1, perPage: 1000
-func (d *PostgresDriver) ReadAppsByHeight(height int, options *ReadAppsByHeightOptions) ([]*indexer.App, error) {
+func (d *PostgresDriver) ReadApps(options *ReadAppsOptions) ([]*indexer.App, error) {
 	perPage := defaultPerPage
 	page := defaultPage
+	height := 0
 
 	if options != nil {
 		perPage = getPerPageValue(options.PerPage)
 		page = getPageValue(options.Page)
+		height = options.Height
 	}
 
 	move := getMoveValue(perPage, page)
@@ -976,7 +1118,8 @@ func (d *PostgresDriver) ReadAppsByHeight(height int, options *ReadAppsByHeightO
 		return nil, err
 	}
 
-	query := fmt.Sprintf(selectAppsByHeightScript, height, move, perPage)
+	query := getHeightOptionalQuery(selectAppsByHeightScript, selectAppsScript,
+		height, move, perPage)
 
 	var apps []*dbApp
 
@@ -999,9 +1142,21 @@ func (d *PostgresDriver) ReadAppsByHeight(height int, options *ReadAppsByHeightO
 	return indexerApps, nil
 }
 
-// GetAppsQuantityByHeight returns quantity of apps with given height saved
-func (d *PostgresDriver) GetAppsQuantityByHeight(height int) (int64, error) {
-	row := d.QueryRow(selectCountFromAppsByHeight, height)
+// GetAppsQuantityOptions optinal params for GetAppsQuantity
+type GetAppsQuantityOptions struct {
+	Height int
+}
+
+// GetAppsQuantity returns quantity of apps with given height saved
+// default height is last height
+func (d *PostgresDriver) GetAppsQuantity(options *GetAppsQuantityOptions) (int64, error) {
+	var height int
+
+	if options != nil {
+		height = options.Height
+	}
+
+	row := d.getRowWithOptionalHeight(selectCountFromAppsByHeight, selectCountFromApps, height)
 
 	var quantity int64
 
