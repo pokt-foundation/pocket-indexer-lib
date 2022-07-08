@@ -28,7 +28,7 @@ func TestIndexer_IndexAccount(t *testing.T) {
 	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryAccountRoute),
 		http.StatusInternalServerError, "samples/query_account.json")
 
-	err := indexer.IndexAccount("ABCD", 30363)
+	err := indexer.IndexAccount("ABCD", 30363, AccountTypeNode)
 	c.Equal(provider.Err5xxOnConnection, err)
 
 	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryAccountRoute),
@@ -36,11 +36,11 @@ func TestIndexer_IndexAccount(t *testing.T) {
 
 	writerMock.On("WriteAccount", testMock.Anything).Return(errors.New("forced failure")).Once()
 
-	err = indexer.IndexAccount("ABCD", 30363)
+	err = indexer.IndexAccount("ABCD", 30363, AccountTypeNode)
 	c.EqualError(err, "forced failure")
 
 	writerMock.On("WriteAccount", testMock.Anything).Return(nil).Once()
 
-	err = indexer.IndexAccount("ABCD", 30363)
+	err = indexer.IndexAccount("ABCD", 30363, AccountTypeNode)
 	c.NoError(err)
 }

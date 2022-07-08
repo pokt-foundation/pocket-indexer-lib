@@ -19,7 +19,7 @@ func TestPostgresDriver_WriteAccount(t *testing.T) {
 	defer db.Close()
 
 	mock.ExpectExec("INSERT into accounts").WithArgs("00353abd21ef72725b295ba5a9a5eb6082548e21",
-		21, "212121", "upokt").
+		21, "node", "212121", "upokt").
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
@@ -27,18 +27,20 @@ func TestPostgresDriver_WriteAccount(t *testing.T) {
 	err = driver.WriteAccount(&indexer.Account{
 		Address:             "00353abd21ef72725b295ba5a9a5eb6082548e21",
 		Height:              21,
+		AccountType:         indexer.AccountTypeNode,
 		Balance:             big.NewInt(212121),
 		BalanceDenomination: "upokt",
 	})
 	c.NoError(err)
 
 	mock.ExpectExec("INSERT into accounts").WithArgs("00353abd21ef72725b295ba5a9a5eb6082548e21",
-		21, "212121", "upokt").
+		21, "node", "212121", "upokt").
 		WillReturnError(errors.New("dummy error"))
 
 	err = driver.WriteAccount(&indexer.Account{
 		Address:             "00353abd21ef72725b295ba5a9a5eb6082548e21",
 		Height:              21,
+		AccountType:         indexer.AccountTypeNode,
 		Balance:             big.NewInt(212121),
 		BalanceDenomination: "upokt",
 	})
@@ -53,8 +55,8 @@ func TestPostgresDriver_ReadAccountByAddress(t *testing.T) {
 
 	defer db.Close()
 
-	rows := sqlmock.NewRows([]string{"id", "address", "height", "balance", "balance_denomination"}).
-		AddRow(1, "00353abd21ef72725b295ba5a9a5eb6082548e21", 21, "212121", "upokt")
+	rows := sqlmock.NewRows([]string{"id", "address", "height", "account_type", "balance", "balance_denomination"}).
+		AddRow(1, "00353abd21ef72725b295ba5a9a5eb6082548e21", 21, "node", "212121", "upokt")
 
 	mock.ExpectQuery("^SELECT (.+) FROM accounts (.+)").WillReturnRows(rows)
 
@@ -68,8 +70,8 @@ func TestPostgresDriver_ReadAccountByAddress(t *testing.T) {
 	c.NoError(err)
 	c.NotEmpty(account)
 
-	rows = sqlmock.NewRows([]string{"id", "address", "height", "balance", "balance_denomination"}).
-		AddRow(1, "00353abd21ef72725b295ba5a9a5eb6082548e21", 21, "212121", "upokt")
+	rows = sqlmock.NewRows([]string{"id", "address", "height", "account_type", "balance", "balance_denomination"}).
+		AddRow(1, "00353abd21ef72725b295ba5a9a5eb6082548e21", 21, "node", "212121", "upokt")
 
 	mock.ExpectQuery("^SELECT (.+) FROM accounts (.+)").WillReturnRows(rows)
 
@@ -98,9 +100,9 @@ func TestPostgresDriver_ReadAccounts(t *testing.T) {
 
 	defer db.Close()
 
-	rows := sqlmock.NewRows([]string{"id", "address", "height", "balance", "balance_denomination"}).
-		AddRow(1, "00353abd21ef72725b295ba5a9a5eb6082548e21", 21, "212121", "upokt").
-		AddRow(2, "00353abd21ef72725b295ba5a9a5eb6082548e22", 21, "212121", "upokt")
+	rows := sqlmock.NewRows([]string{"id", "address", "height", "account_type", "balance", "balance_denomination"}).
+		AddRow(1, "00353abd21ef72725b295ba5a9a5eb6082548e21", 21, "node", "212121", "upokt").
+		AddRow(2, "00353abd21ef72725b295ba5a9a5eb6082548e22", 21, "node", "212121", "upokt")
 
 	mock.ExpectBegin()
 	mock.ExpectQuery(".*").WillReturnRows(rows)

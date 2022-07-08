@@ -9,8 +9,8 @@ import (
 
 const (
 	insertAccountScript = `
-	INSERT into accounts (address, height, balance, balance_denomination)
-	VALUES (:address, :height, :balance, :balance_denomination)`
+	INSERT into accounts (address, height, account_type, balance, balance_denomination)
+	VALUES (:address, :height, :account_type, :balance, :balance_denomination)`
 	selectAccountsScript = `
 	DECLARE accounts_cursor CURSOR FOR SELECT * FROM accounts WHERE height = (SELECT MAX(height) FROM accounts);
 	MOVE absolute %d from accounts_cursor;
@@ -32,6 +32,7 @@ type dbAccount struct {
 	ID                  int    `db:"id"`
 	Address             string `db:"address"`
 	Height              int    `db:"height"`
+	AccountType         string `db:"account_type"`
 	Balance             string `db:"balance"`
 	BalanceDenomination string `db:"balance_denomination"`
 }
@@ -43,6 +44,7 @@ func (a *dbAccount) toIndexerAccount() *indexer.Account {
 	return &indexer.Account{
 		Address:             a.Address,
 		Height:              a.Height,
+		AccountType:         indexer.AccountType(a.AccountType),
 		Balance:             balance,
 		BalanceDenomination: a.BalanceDenomination,
 	}
@@ -52,6 +54,7 @@ func convertIndexerAccountToDBAccount(indexerAccount *indexer.Account) *dbAccoun
 	return &dbAccount{
 		Address:             indexerAccount.Address,
 		Height:              indexerAccount.Height,
+		AccountType:         string(indexerAccount.AccountType),
 		Balance:             indexerAccount.Balance.String(),
 		BalanceDenomination: indexerAccount.BalanceDenomination,
 	}
