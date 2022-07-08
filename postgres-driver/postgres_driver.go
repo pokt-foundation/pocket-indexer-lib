@@ -18,7 +18,7 @@ const (
 	insertTransactionsScript = `
 	INSERT into transactions (hash, from_address, to_address, app_pub_key, blockchains, message_type, height, index, stdtx, tx_result, tx, entropy, fee, fee_denomination, amount)
 	(
-		select * from unnest($1::text[], $2::text[], $3::text[], $4::text[], $5::text[], $6::text[], $7::int[], $8::int[], $9::jsonb[], $10::jsonb[], $11::text[], $12::numeric[], $13::int[], $14::text[], $15::int[])
+		select * from unnest($1::text[], $2::text[], $3::text[], $4::text[], $5::text[], $6::text[], $7::int[], $8::int[], $9::jsonb[], $10::jsonb[], $11::text[], $12::numeric[], $13::int[], $14::text[], $15::numeric[])
 	)`
 	insertBlockScript = `
 	INSERT into blocks (hash, height, time, proposer_address, tx_count)
@@ -162,10 +162,13 @@ type dbTransaction struct {
 	Entropy         int       `db:"entropy"`
 	Fee             int       `db:"fee"`
 	FeeDenomination string    `db:"fee_denomination"`
-	Amount          int       `db:"amount"`
+	Amount          string    `db:"amount"`
 }
 
 func (t *dbTransaction) toIndexerTransaction() *indexer.Transaction {
+	amount := new(big.Int)
+	amount, _ = amount.SetString(t.Amount, 10)
+
 	return &indexer.Transaction{
 		Hash:            t.Hash,
 		FromAddress:     t.FromAddress.String,
@@ -181,7 +184,7 @@ func (t *dbTransaction) toIndexerTransaction() *indexer.Transaction {
 		Entropy:         t.Entropy,
 		Fee:             t.Fee,
 		FeeDenomination: t.FeeDenomination,
-		Amount:          t.Amount,
+		Amount:          amount,
 	}
 }
 
@@ -212,15 +215,15 @@ func convertIndexerTransactionToDBTransaction(indexerTransaction *indexer.Transa
 		Entropy:         indexerTransaction.Entropy,
 		Fee:             indexerTransaction.Fee,
 		FeeDenomination: indexerTransaction.FeeDenomination,
-		Amount:          indexerTransaction.Amount,
+		Amount:          indexerTransaction.Amount.String(),
 	}
 }
 
 // WriteTransactions inserts given transactions to the database
 func (d *PostgresDriver) WriteTransactions(txs []*indexer.Transaction) error {
-	var hashes, appPubKeys, blockChains, messageTypes, txStrings, feeDenominations []string
+	var hashes, appPubKeys, blockChains, messageTypes, txStrings, feeDenominations, amounts []string
 	var fromAddresses, toAddresses []sql.NullString
-	var heights, indexes, entropies, fees, amounts []int64
+	var heights, indexes, entropies, fees []int64
 	var stdTxs []*stdTx
 	var txResults []*txResult
 
@@ -240,7 +243,7 @@ func (d *PostgresDriver) WriteTransactions(txs []*indexer.Transaction) error {
 		entropies = append(entropies, int64(dbTransaction.Entropy))
 		fees = append(fees, int64(dbTransaction.Fee))
 		feeDenominations = append(feeDenominations, dbTransaction.FeeDenomination)
-		amounts = append(amounts, int64(dbTransaction.Amount))
+		amounts = append(amounts, dbTransaction.Amount)
 	}
 
 	_, err := d.Exec(insertTransactionsScript,
@@ -258,7 +261,7 @@ func (d *PostgresDriver) WriteTransactions(txs []*indexer.Transaction) error {
 		pq.Int64Array(entropies),
 		pq.Int64Array(fees),
 		pq.StringArray(feeDenominations),
-		pq.Int64Array(amounts))
+		pq.StringArray(amounts))
 	if err != nil {
 		return err
 	}
