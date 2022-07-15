@@ -99,7 +99,6 @@ func (d *PostgresDriver) ReadBlocks(options *ReadBlocksOptions) ([]*indexer.Bloc
 	var blocks []*dbBlock
 
 	err = tx.Select(&blocks, query)
-
 	if err != nil {
 		return nil, err
 	}

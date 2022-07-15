@@ -2,7 +2,6 @@ package postgresdriver
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -71,8 +70,6 @@ func TestPostgresDriver_ReadBlocks(t *testing.T) {
 	c.NoError(err)
 	c.Len(blocks, 2)
 	c.Equal(blocks[0].Hash, "ABCD")
-
-	fmt.Println("BLOCKS", blocks[0].Height, blocks[1].Height)
 
 	mock.ExpectBegin()
 	mock.ExpectQuery(".*").WillReturnError(errors.New("dummy error"))
