@@ -2,10 +2,12 @@ package postgresdriver
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/pokt-foundation/pocket-go/provider"
 	indexer "github.com/pokt-foundation/pocket-indexer-lib"
 	"github.com/stretchr/testify/require"
 )
@@ -57,7 +59,7 @@ func TestPostgresDriver_ReadBlocks(t *testing.T) {
 
 	rows := sqlmock.NewRows([]string{"id", "hash", "height", "time", "proposer_address", "tx_count"}).
 		AddRow(1, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21).
-		AddRow(2, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21)
+		AddRow(1, "EDFG", 22, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21)
 
 	mock.ExpectBegin()
 	mock.ExpectQuery(".*").WillReturnRows(rows)
@@ -65,9 +67,12 @@ func TestPostgresDriver_ReadBlocks(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	blocks, err := driver.ReadBlocks(&ReadBlocksOptions{Page: 21, PerPage: 7})
+	blocks, err := driver.ReadBlocks(&ReadBlocksOptions{Page: 1, PerPage: 7, Order: provider.DescendantOrder})
 	c.NoError(err)
 	c.Len(blocks, 2)
+	c.Equal(blocks[0].Hash, "ABCD")
+
+	fmt.Println("BLOCKS", blocks[0].Height, blocks[1].Height)
 
 	mock.ExpectBegin()
 	mock.ExpectQuery(".*").WillReturnError(errors.New("dummy error"))
