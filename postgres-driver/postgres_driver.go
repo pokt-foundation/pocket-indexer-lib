@@ -6,13 +6,21 @@ import (
 	"fmt"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/pokt-foundation/pocket-go/provider"
+)
+
+type Order string
+
+const (
+	// DescendantOrder represents greater to lower order
+	DescendantOrder Order = "desc"
+	// AscendantOrder represents lower to greater order
+	AscendantOrder Order = "asc"
 )
 
 const (
 	defaultPerPage = 1000
 	defaultPage    = 1
-	defaultOrder   = provider.DescendantOrder
+	defaultOrder   = DescendantOrder
 )
 
 var (
@@ -74,7 +82,7 @@ func getPageValue(optionsPage int) int {
 	return optionsPage
 }
 
-func getOrderValue(optionsOrder provider.Order) provider.Order {
+func getOrderValue(optionsOrder Order) Order {
 	if optionsOrder == "" {
 		return defaultOrder
 	}

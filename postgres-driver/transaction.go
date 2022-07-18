@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/lib/pq"
-	"github.com/pokt-foundation/pocket-go/provider"
 	"github.com/pokt-foundation/pocket-go/utils"
 	indexer "github.com/pokt-foundation/pocket-indexer-lib"
 )
@@ -166,7 +165,7 @@ func (d *PostgresDriver) WriteTransactions(txs []*indexer.Transaction) error {
 type ReadTransactionsOptions struct {
 	PerPage int
 	Page    int
-	Order   provider.Order
+	Order   Order
 }
 
 // ReadTransactions returns transactions on the database with pagination

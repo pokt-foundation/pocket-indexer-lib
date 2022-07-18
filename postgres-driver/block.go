@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pokt-foundation/pocket-go/provider"
 	indexer "github.com/pokt-foundation/pocket-indexer-lib"
 )
 
@@ -71,7 +70,7 @@ func (d *PostgresDriver) WriteBlock(block *indexer.Block) error {
 type ReadBlocksOptions struct {
 	PerPage int
 	Page    int
-	Order   provider.Order
+	Order   Order
 }
 
 // ReadBlocks returns all blocks on the database with pagination
