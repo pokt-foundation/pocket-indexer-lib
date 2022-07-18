@@ -8,6 +8,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+// Order enum allows user to select order of returned results - desc or asc
 type Order string
 
 const (
