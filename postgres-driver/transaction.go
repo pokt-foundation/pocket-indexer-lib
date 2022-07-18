@@ -18,7 +18,7 @@ const (
 		select * from unnest($1::text[], $2::text[], $3::text[], $4::text[], $5::text[], $6::text[], $7::int[], $8::int[], $9::jsonb[], $10::jsonb[], $11::text[], $12::numeric[], $13::int[], $14::text[], $15::numeric[])
 	)`
 	selectTransactionsScript = `
-	DECLARE transactions_cursor CURSOR FOR SELECT * FROM transactions ORDER BY height DESC;
+	DECLARE transactions_cursor CURSOR FOR SELECT * FROM transactions ORDER BY height %s;
 	MOVE absolute %d from transactions_cursor;
 	FETCH %d FROM transactions_cursor;
 	`
@@ -165,6 +165,7 @@ func (d *PostgresDriver) WriteTransactions(txs []*indexer.Transaction) error {
 type ReadTransactionsOptions struct {
 	PerPage int
 	Page    int
+	Order   Order
 }
 
 // ReadTransactions returns transactions on the database with pagination
@@ -172,10 +173,12 @@ type ReadTransactionsOptions struct {
 func (d *PostgresDriver) ReadTransactions(options *ReadTransactionsOptions) ([]*indexer.Transaction, error) {
 	perPage := defaultPerPage
 	page := defaultPage
+	order := defaultOrder
 
 	if options != nil {
 		perPage = getPerPageValue(options.PerPage)
 		page = getPageValue(options.Page)
+		order = getOrderValue(options.Order)
 	}
 
 	move := getMoveValue(perPage, page)
@@ -185,7 +188,7 @@ func (d *PostgresDriver) ReadTransactions(options *ReadTransactionsOptions) ([]*
 		return nil, err
 	}
 
-	query := fmt.Sprintf(selectTransactionsScript, move, perPage)
+	query := fmt.Sprintf(selectTransactionsScript, order, move, perPage)
 
 	var transactions []*dbTransaction
 

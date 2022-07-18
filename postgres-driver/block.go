@@ -13,7 +13,7 @@ const (
 	INSERT into blocks (hash, height, time, proposer_address, tx_count)
 	VALUES (:hash, :height, :time, :proposer_address, :tx_count)`
 	selectBlocksScript = `
-	DECLARE blocks_cursor CURSOR FOR SELECT * FROM blocks ORDER BY height DESC;
+	DECLARE blocks_cursor CURSOR FOR SELECT * FROM blocks ORDER BY height %s;
 	MOVE absolute %d from blocks_cursor;
 	FETCH %d FROM blocks_cursor;
 	`
@@ -70,6 +70,7 @@ func (d *PostgresDriver) WriteBlock(block *indexer.Block) error {
 type ReadBlocksOptions struct {
 	PerPage int
 	Page    int
+	Order   Order
 }
 
 // ReadBlocks returns all blocks on the database with pagination
@@ -77,10 +78,12 @@ type ReadBlocksOptions struct {
 func (d *PostgresDriver) ReadBlocks(options *ReadBlocksOptions) ([]*indexer.Block, error) {
 	perPage := defaultPerPage
 	page := defaultPage
+	order := defaultOrder
 
 	if options != nil {
 		perPage = getPerPageValue(options.PerPage)
 		page = getPageValue(options.Page)
+		order = getOrderValue(options.Order)
 	}
 
 	move := getMoveValue(perPage, page)
@@ -90,7 +93,7 @@ func (d *PostgresDriver) ReadBlocks(options *ReadBlocksOptions) ([]*indexer.Bloc
 		return nil, err
 	}
 
-	query := fmt.Sprintf(selectBlocksScript, move, perPage)
+	query := fmt.Sprintf(selectBlocksScript, order, move, perPage)
 
 	var blocks []*dbBlock
 

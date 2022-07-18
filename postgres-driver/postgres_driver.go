@@ -8,9 +8,20 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+// Order enum allows user to select order of returned results - desc or asc
+type Order string
+
+const (
+	// DescendantOrder represents greater to lower order
+	DescendantOrder Order = "desc"
+	// AscendantOrder represents lower to greater order
+	AscendantOrder Order = "asc"
+)
+
 const (
 	defaultPerPage = 1000
 	defaultPage    = 1
+	defaultOrder   = DescendantOrder
 )
 
 var (
@@ -70,6 +81,14 @@ func getPageValue(optionsPage int) int {
 	}
 
 	return optionsPage
+}
+
+func getOrderValue(optionsOrder Order) Order {
+	if optionsOrder == "" {
+		return defaultOrder
+	}
+
+	return optionsOrder
 }
 
 func getMoveValue(perPage, page int) int {
