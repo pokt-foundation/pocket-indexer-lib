@@ -7,7 +7,6 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	indexer "github.com/pokt-foundation/pocket-indexer-lib"
-	postgresdriver "github.com/pokt-foundation/pocket-indexer-lib/postgres-driver"
 	"github.com/stretchr/testify/require"
 )
 
@@ -66,7 +65,7 @@ func TestPostgresDriver_ReadBlocks(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	blocks, err := driver.ReadBlocks(&ReadBlocksOptions{Page: 1, PerPage: 7, Order: postgresdriver.DescendantOrder})
+	blocks, err := driver.ReadBlocks(&ReadBlocksOptions{Page: 1, PerPage: 7, Order: DescendantOrder})
 	c.NoError(err)
 	c.Len(blocks, 2)
 	c.Equal(blocks[0].Hash, "ABCD")
