@@ -1,3 +1,4 @@
+// Package postgresdriver is the implementation of Writer interface for the Indexer using postgres SQL as persistance
 package postgresdriver
 
 import (

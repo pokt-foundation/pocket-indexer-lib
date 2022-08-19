@@ -1,3 +1,4 @@
+// Package indexer has the functions to get node values from a node and save them with a Writer interface
 package indexer
 
 import (
