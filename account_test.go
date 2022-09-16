@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestIndexer_IndexAccount(t *testing.T) {
+func TestIndexer_IndexAccounts(t *testing.T) {
 	c := require.New(t)
 
 	httpmock.Activate()
@@ -25,22 +25,34 @@ func TestIndexer_IndexAccount(t *testing.T) {
 
 	indexer := NewIndexer(reqProvider, writerMock)
 
-	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryAccountRoute),
-		http.StatusInternalServerError, "samples/query_account.json")
+	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryAccountsRoute),
+		http.StatusInternalServerError, "samples/query_accounts.json")
 
-	err := indexer.IndexAccount("ABCD", 30363, AccountTypeNode)
+	addresses, err := indexer.IndexAccounts(30363)
 	c.Equal(provider.Err5xxOnConnection, err)
+	c.Empty(addresses)
 
-	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryAccountRoute),
-		http.StatusOK, "samples/query_account.json")
+	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryAccountsRoute),
+		http.StatusOK, "samples/query_accounts_empty.json")
 
-	writerMock.On("WriteAccount", testMock.Anything).Return(errors.New("forced failure")).Once()
+	addresses, err = indexer.IndexAccounts(30363)
+	c.Equal(ErrNoAccountsToIndex, err)
+	c.Empty(addresses)
 
-	err = indexer.IndexAccount("ABCD", 30363, AccountTypeNode)
+	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryAccountsRoute),
+		http.StatusOK, "samples/query_accounts.json")
+
+	writerMock.On("WriteAccounts", testMock.Anything).Return(errors.New("forced failure")).Once()
+
+	addresses, err = indexer.IndexAccounts(30363)
 	c.EqualError(err, "forced failure")
+	c.Len(addresses, 1)
+	c.Equal("98a18a38aa6826a55dccce19f607e3171cf14366", addresses[0])
 
-	writerMock.On("WriteAccount", testMock.Anything).Return(nil).Once()
+	writerMock.On("WriteAccounts", testMock.Anything).Return(nil).Once()
 
-	err = indexer.IndexAccount("ABCD", 30363, AccountTypeNode)
+	addresses, err = indexer.IndexAccounts(30363)
 	c.NoError(err)
+	c.Len(addresses, 1)
+	c.Equal("98a18a38aa6826a55dccce19f607e3171cf14366", addresses[0])
 }

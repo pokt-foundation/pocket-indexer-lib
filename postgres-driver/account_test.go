@@ -6,11 +6,12 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/lib/pq"
 	indexer "github.com/pokt-foundation/pocket-indexer-lib"
 	"github.com/stretchr/testify/require"
 )
 
-func TestPostgresDriver_WriteAccount(t *testing.T) {
+func TestPostgresDriver_WriteAccounts(t *testing.T) {
 	c := require.New(t)
 
 	db, mock, err := sqlmock.New()
@@ -18,31 +19,33 @@ func TestPostgresDriver_WriteAccount(t *testing.T) {
 
 	defer db.Close()
 
-	mock.ExpectExec("INSERT into accounts").WithArgs("00353abd21ef72725b295ba5a9a5eb6082548e21",
-		21, "node", "212121", "upokt").
+	mock.ExpectExec("INSERT into accounts").WithArgs(pq.StringArray([]string{"00353abd21ef72725b295ba5a9a5eb6082548e21"}),
+		pq.Int64Array([]int64{21}), pq.StringArray([]string{"212121"}), pq.StringArray([]string{"upokt"})).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	err = driver.WriteAccount(&indexer.Account{
-		Address:             "00353abd21ef72725b295ba5a9a5eb6082548e21",
-		Height:              21,
-		AccountType:         indexer.AccountTypeNode,
-		Balance:             big.NewInt(212121),
-		BalanceDenomination: "upokt",
+	err = driver.WriteAccounts([]*indexer.Account{
+		{
+			Address:             "00353abd21ef72725b295ba5a9a5eb6082548e21",
+			Height:              21,
+			Balance:             big.NewInt(212121),
+			BalanceDenomination: "upokt",
+		},
 	})
 	c.NoError(err)
 
-	mock.ExpectExec("INSERT into accounts").WithArgs("00353abd21ef72725b295ba5a9a5eb6082548e21",
-		21, "node", "212121", "upokt").
+	mock.ExpectExec("INSERT into accounts").WithArgs(pq.StringArray([]string{"00353abd21ef72725b295ba5a9a5eb6082548e21"}),
+		pq.Int64Array([]int64{21}), pq.StringArray([]string{"212121"}), pq.StringArray([]string{"upokt"})).
 		WillReturnError(errors.New("dummy error"))
 
-	err = driver.WriteAccount(&indexer.Account{
-		Address:             "00353abd21ef72725b295ba5a9a5eb6082548e21",
-		Height:              21,
-		AccountType:         indexer.AccountTypeNode,
-		Balance:             big.NewInt(212121),
-		BalanceDenomination: "upokt",
+	err = driver.WriteAccounts([]*indexer.Account{
+		{
+			Address:             "00353abd21ef72725b295ba5a9a5eb6082548e21",
+			Height:              21,
+			Balance:             big.NewInt(212121),
+			BalanceDenomination: "upokt",
+		},
 	})
 	c.EqualError(err, "dummy error")
 }
@@ -55,8 +58,8 @@ func TestPostgresDriver_ReadAccountByAddress(t *testing.T) {
 
 	defer db.Close()
 
-	rows := sqlmock.NewRows([]string{"id", "address", "height", "account_type", "balance", "balance_denomination"}).
-		AddRow(1, "00353abd21ef72725b295ba5a9a5eb6082548e21", 21, "node", "212121", "upokt")
+	rows := sqlmock.NewRows([]string{"id", "address", "height", "balance", "balance_denomination"}).
+		AddRow(1, "00353abd21ef72725b295ba5a9a5eb6082548e21", 21, "212121", "upokt")
 
 	mock.ExpectQuery("^SELECT (.+) FROM accounts (.+)").WillReturnRows(rows)
 
@@ -70,8 +73,8 @@ func TestPostgresDriver_ReadAccountByAddress(t *testing.T) {
 	c.NoError(err)
 	c.NotEmpty(account)
 
-	rows = sqlmock.NewRows([]string{"id", "address", "height", "account_type", "balance", "balance_denomination"}).
-		AddRow(1, "00353abd21ef72725b295ba5a9a5eb6082548e21", 21, "node", "212121", "upokt")
+	rows = sqlmock.NewRows([]string{"id", "address", "height", "balance", "balance_denomination"}).
+		AddRow(1, "00353abd21ef72725b295ba5a9a5eb6082548e21", 21, "212121", "upokt")
 
 	mock.ExpectQuery("^SELECT (.+) FROM accounts (.+)").WillReturnRows(rows)
 
@@ -100,9 +103,9 @@ func TestPostgresDriver_ReadAccounts(t *testing.T) {
 
 	defer db.Close()
 
-	rows := sqlmock.NewRows([]string{"id", "address", "height", "account_type", "balance", "balance_denomination"}).
-		AddRow(1, "00353abd21ef72725b295ba5a9a5eb6082548e21", 21, "node", "212121", "upokt").
-		AddRow(2, "00353abd21ef72725b295ba5a9a5eb6082548e22", 21, "node", "212121", "upokt")
+	rows := sqlmock.NewRows([]string{"id", "address", "height", "balance", "balance_denomination"}).
+		AddRow(1, "00353abd21ef72725b295ba5a9a5eb6082548e21", 21, "212121", "upokt").
+		AddRow(2, "00353abd21ef72725b295ba5a9a5eb6082548e22", 21, "212121", "upokt")
 
 	mock.ExpectBegin()
 	mock.ExpectQuery(".*").WillReturnRows(rows)

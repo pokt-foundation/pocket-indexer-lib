@@ -20,8 +20,8 @@ func (w *writerMock) WriteTransactions(txs []*Transaction) error {
 	return args.Error(0)
 }
 
-func (w *writerMock) WriteAccount(account *Account) error {
-	args := w.Called(account)
+func (w *writerMock) WriteAccounts(accounts []*Account) error {
+	args := w.Called(accounts)
 
 	return args.Error(0)
 }

@@ -7,7 +7,7 @@ require (
 	github.com/jarcoal/httpmock v1.2.0
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/lib/pq v1.10.5
-	github.com/pokt-foundation/pocket-go v0.10.3
+	github.com/pokt-foundation/pocket-go v0.10.6
 	github.com/pokt-foundation/utils-go v0.2.0
 	github.com/stretchr/testify v1.8.0
 )
