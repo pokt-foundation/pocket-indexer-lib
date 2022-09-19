@@ -1,31 +1,26 @@
 package indexer
 
 import (
+	"errors"
 	"math/big"
 
 	"github.com/pokt-foundation/pocket-go/provider"
 )
 
-// AccountType enum of possible account types
-type AccountType string
-
-const (
-	// AccountTypeNode represents node account type
-	AccountTypeNode AccountType = "node"
-	// AccountTypeApp represents app account type
-	AccountTypeApp AccountType = "app"
+var (
+	// ErrNoAccountsToIndex error when there are no accounts to index
+	ErrNoAccountsToIndex = errors.New("no accounts to index")
 )
 
 // Account struct handler of all account fields to be indexed
 type Account struct {
 	Address             string
 	Height              int
-	AccountType         AccountType
 	Balance             *big.Int
 	BalanceDenomination string
 }
 
-func convertProviderAccountToAccount(height int, accountType AccountType, providerAccount *provider.GetAccountOutput) *Account {
+func convertProviderAccountToAccount(height int, providerAccount *provider.GetAccountOutput) *Account {
 	var balanceDenomination string
 	balance := new(big.Int)
 
@@ -38,18 +33,45 @@ func convertProviderAccountToAccount(height int, accountType AccountType, provid
 	return &Account{
 		Address:             providerAccount.Address,
 		Height:              height,
-		AccountType:         accountType,
 		Balance:             balance,
 		BalanceDenomination: balanceDenomination,
 	}
 }
 
-// IndexAccount converts account details to a known structure and saves them
-func (i *Indexer) IndexAccount(address string, blockHeight int, accountType AccountType) error {
-	accountOutput, err := i.provider.GetAccount(address, &provider.GetAccountOptions{Height: blockHeight})
-	if err != nil {
-		return err
+// IndexAccounts converts accounts details to known structures and saved them
+// returns all addresses indexed
+func (i *Indexer) IndexAccounts(blockHeight int) ([]string, error) {
+	totalPages := 1
+	var providerAccounts []*provider.GetAccountOutput
+
+	for page := 1; page <= totalPages; page++ {
+		accountsOutput, err := i.provider.GetAccounts(&provider.GetAccountsOptions{
+			Height:  blockHeight,
+			Page:    page,
+			PerPage: 10000,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		if page == 1 {
+			totalPages = accountsOutput.TotalPages
+		}
+
+		providerAccounts = append(providerAccounts, accountsOutput.Result...)
 	}
 
-	return i.writer.WriteAccount(convertProviderAccountToAccount(blockHeight, accountType, accountOutput))
+	if len(providerAccounts) == 0 {
+		return nil, ErrNoAccountsToIndex
+	}
+
+	var accounts []*Account
+	var addresses []string
+
+	for _, account := range providerAccounts {
+		accounts = append(accounts, convertProviderAccountToAccount(blockHeight, account))
+		addresses = append(addresses, account.Address)
+	}
+
+	return addresses, i.writer.WriteAccounts(accounts)
 }

@@ -9,7 +9,7 @@ import (
 type Provider interface {
 	GetBlock(blockNumber int) (*provider.GetBlockOutput, error)
 	GetBlockTransactions(options *provider.GetBlockTransactionsOptions) (*provider.GetBlockTransactionsOutput, error)
-	GetAccount(address string, options *provider.GetAccountOptions) (*provider.GetAccountOutput, error)
+	GetAccounts(options *provider.GetAccountsOptions) (*provider.GetAccountsOutput, error)
 	GetNodes(options *provider.GetNodesOptions) (*provider.GetNodesOutput, error)
 	GetApps(options *provider.GetAppsOptions) (*provider.GetAppsOutput, error)
 }
@@ -18,7 +18,7 @@ type Provider interface {
 type Writer interface {
 	WriteBlock(block *Block) error
 	WriteTransactions(txs []*Transaction) error
-	WriteAccount(account *Account) error
+	WriteAccounts(accounts []*Account) error
 	WriteNodes(nodes []*Node) error
 	WriteApps(apps []*App) error
 }
