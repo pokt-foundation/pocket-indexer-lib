@@ -65,11 +65,7 @@ func TestPostgresDriver_ReadAccountByAddress(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	account, err := driver.ReadAccountByAddress("00353abd21ef72725b295ba5a9a5eb6082548e2", &ReadAccountByAddressOptions{Height: 21})
-	c.Equal(ErrInvalidAddress, err)
-	c.Empty(account)
-
-	account, err = driver.ReadAccountByAddress("00353abd21ef72725b295ba5a9a5eb6082548e21", &ReadAccountByAddressOptions{Height: 21})
+	account, err := driver.ReadAccountByAddress("00353abd21ef72725b295ba5a9a5eb6082548e21", &ReadAccountByAddressOptions{Height: 21})
 	c.NoError(err)
 	c.NotEmpty(account)
 

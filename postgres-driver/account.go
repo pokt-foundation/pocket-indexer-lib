@@ -4,7 +4,6 @@ import (
 	"math/big"
 
 	"github.com/lib/pq"
-	"github.com/pokt-foundation/pocket-go/utils"
 	indexer "github.com/pokt-foundation/pocket-indexer-lib"
 )
 
@@ -91,10 +90,6 @@ type ReadAccountByAddressOptions struct {
 
 // ReadAccountByAddress returns an account in the database with given address
 func (d *PostgresDriver) ReadAccountByAddress(address string, options *ReadAccountByAddressOptions) (*indexer.Account, error) {
-	if !utils.ValidateAddress(address) {
-		return nil, ErrInvalidAddress
-	}
-
 	var dbAccount dbAccount
 	var height int
 
