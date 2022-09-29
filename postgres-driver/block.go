@@ -10,8 +10,8 @@ import (
 
 const (
 	insertBlockScript = `
-	INSERT into blocks (hash, height, time, proposer_address, tx_count)
-	VALUES (:hash, :height, :time, :proposer_address, :tx_count)`
+	INSERT into blocks (hash, height, time, proposer_address, tx_count, tx_total)
+	VALUES (:hash, :height, :time, :proposer_address, :tx_count, :tx_total)`
 	selectBlocksScript = `
 	DECLARE blocks_cursor CURSOR FOR SELECT * FROM blocks ORDER BY height %s;
 	MOVE absolute %d from blocks_cursor;
@@ -32,6 +32,7 @@ type dbBlock struct {
 	Time            time.Time `db:"time"`
 	ProposerAddress string    `db:"proposer_address"`
 	TXCount         int       `db:"tx_count"`
+	TXTotal         int       `db:"tx_total"`
 }
 
 func (b *dbBlock) toIndexerBlock() *indexer.Block {
@@ -41,6 +42,7 @@ func (b *dbBlock) toIndexerBlock() *indexer.Block {
 		Time:            b.Time,
 		ProposerAddress: b.ProposerAddress,
 		TXCount:         b.TXCount,
+		TXTotal:         b.TXTotal,
 	}
 }
 
@@ -51,6 +53,7 @@ func convertIndexerBlockToDBBlock(indexerBlock *indexer.Block) *dbBlock {
 		Time:            indexerBlock.Time,
 		ProposerAddress: indexerBlock.ProposerAddress,
 		TXCount:         indexerBlock.TXCount,
+		TXTotal:         indexerBlock.TXTotal,
 	}
 }
 

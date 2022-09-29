@@ -20,12 +20,14 @@ type Block struct {
 	Time            time.Time
 	ProposerAddress string
 	TXCount         int
+	TXTotal         int
 }
 
 func convertProviderBlockToBlock(providerBlock *provider.GetBlockOutput) *Block {
 	blockHeader := providerBlock.Block.Header
 
 	height, _ := strconv.Atoi(blockHeader.Height)
+	countTx, _ := strconv.Atoi(blockHeader.NumTxs)
 	totalTxs, _ := strconv.Atoi(blockHeader.TotalTxs)
 
 	return &Block{
@@ -33,7 +35,8 @@ func convertProviderBlockToBlock(providerBlock *provider.GetBlockOutput) *Block 
 		Height:          height,
 		Time:            blockHeader.Time,
 		ProposerAddress: blockHeader.ProposerAddress,
-		TXCount:         totalTxs,
+		TXCount:         countTx,
+		TXTotal:         totalTxs,
 	}
 }
 
