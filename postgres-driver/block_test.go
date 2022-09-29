@@ -19,7 +19,7 @@ func TestPostgresDriver_WriteBlock(t *testing.T) {
 	defer db.Close()
 
 	mock.ExpectExec("INSERT into blocks").WithArgs("AF5BB3EAFF431E2E5E784D639825979FF20A779725BFE61D4521340F70C3996D0",
-		21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "A2143929B30CBC3E7A30C2DE06B385BCF874134B", 32).
+		21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "A2143929B30CBC3E7A30C2DE06B385BCF874134B", 32, 100).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
@@ -30,11 +30,12 @@ func TestPostgresDriver_WriteBlock(t *testing.T) {
 		Time:            time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local),
 		ProposerAddress: "A2143929B30CBC3E7A30C2DE06B385BCF874134B",
 		TXCount:         32,
+		TXTotal:         100,
 	})
 	c.NoError(err)
 
 	mock.ExpectExec("INSERT into blocks").WithArgs("AF5BB3EAFF431E2E5E784D639825979FF20A779725BFE61D4521340F70C3996D0",
-		21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "A2143929B30CBC3E7A30C2DE06B385BCF874134B", 32).
+		21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "A2143929B30CBC3E7A30C2DE06B385BCF874134B", 32, 100).
 		WillReturnError(errors.New("dummy error"))
 
 	err = driver.WriteBlock(&indexer.Block{
@@ -43,6 +44,7 @@ func TestPostgresDriver_WriteBlock(t *testing.T) {
 		Time:            time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local),
 		ProposerAddress: "A2143929B30CBC3E7A30C2DE06B385BCF874134B",
 		TXCount:         32,
+		TXTotal:         100,
 	})
 	c.EqualError(err, "dummy error")
 }
@@ -55,9 +57,9 @@ func TestPostgresDriver_ReadBlocks(t *testing.T) {
 
 	defer db.Close()
 
-	rows := sqlmock.NewRows([]string{"id", "hash", "height", "time", "proposer_address", "tx_count"}).
-		AddRow(1, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21).
-		AddRow(1, "EDFG", 22, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21)
+	rows := sqlmock.NewRows([]string{"id", "hash", "height", "time", "proposer_address", "tx_count", "tx_total"}).
+		AddRow(1, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21, 100).
+		AddRow(1, "EDFG", 22, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21, 100)
 
 	mock.ExpectBegin()
 	mock.ExpectQuery(".*").WillReturnRows(rows)
@@ -87,8 +89,8 @@ func TestPostgresDriver_ReadBlockByHash(t *testing.T) {
 
 	defer db.Close()
 
-	rows := sqlmock.NewRows([]string{"id", "hash", "height", "time", "proposer_address", "tx_count"}).
-		AddRow(1, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21)
+	rows := sqlmock.NewRows([]string{"id", "hash", "height", "time", "proposer_address", "tx_count", "tx_total"}).
+		AddRow(1, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21, 100)
 
 	mock.ExpectQuery("^SELECT (.+) FROM blocks (.+)").WillReturnRows(rows)
 
@@ -113,8 +115,8 @@ func TestPostgresDriver_ReadBlockByHeight(t *testing.T) {
 
 	defer db.Close()
 
-	rows := sqlmock.NewRows([]string{"id", "hash", "height", "time", "proposer_address", "tx_count"}).
-		AddRow(1, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21)
+	rows := sqlmock.NewRows([]string{"id", "hash", "height", "time", "proposer_address", "tx_count", "tx_total"}).
+		AddRow(1, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21, 100)
 
 	mock.ExpectQuery("^SELECT (.+) FROM blocks (.+)").WillReturnRows(rows)
 
@@ -124,8 +126,8 @@ func TestPostgresDriver_ReadBlockByHeight(t *testing.T) {
 	c.NoError(err)
 	c.NotEmpty(block)
 
-	rows = sqlmock.NewRows([]string{"id", "hash", "height", "time", "proposer_address", "tx_count"}).
-		AddRow(1, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21)
+	rows = sqlmock.NewRows([]string{"id", "hash", "height", "time", "proposer_address", "tx_count", "tx_total"}).
+		AddRow(1, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21, 100)
 
 	mock.ExpectQuery("^SELECT (.+) FROM blocks (.+)").WillReturnRows(rows)
 
