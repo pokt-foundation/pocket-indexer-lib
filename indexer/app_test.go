@@ -26,21 +26,21 @@ func TestIndexer_IndexBlockApps(t *testing.T) {
 	indexer := NewIndexer(reqProvider, writerMock)
 
 	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryAppsRoute),
-		http.StatusInternalServerError, "samples/query_apps.json")
+		http.StatusInternalServerError, "../samples/query_apps.json")
 
 	addresses, err := indexer.IndexBlockApps(30363)
 	c.Equal(provider.Err5xxOnConnection, err)
 	c.Empty(addresses)
 
 	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryAppsRoute),
-		http.StatusOK, "samples/query_apps_empty.json")
+		http.StatusOK, "../samples/query_apps_empty.json")
 
 	addresses, err = indexer.IndexBlockApps(30363)
 	c.Equal(ErrNoAppsToIndex, err)
 	c.Empty(addresses)
 
 	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryAppsRoute),
-		http.StatusOK, "samples/query_apps.json")
+		http.StatusOK, "../samples/query_apps.json")
 
 	writerMock.On("WriteApps", testMock.Anything).Return(errors.New("forced failure")).Once()
 

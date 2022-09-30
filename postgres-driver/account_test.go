@@ -7,7 +7,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/lib/pq"
-	indexer "github.com/pokt-foundation/pocket-indexer-lib"
+	"github.com/pokt-foundation/pocket-indexer-lib/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,7 +25,7 @@ func TestPostgresDriver_WriteAccounts(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	err = driver.WriteAccounts([]*indexer.Account{
+	err = driver.WriteAccounts([]*types.Account{
 		{
 			Address:             "00353abd21ef72725b295ba5a9a5eb6082548e21",
 			Height:              21,
@@ -39,7 +39,7 @@ func TestPostgresDriver_WriteAccounts(t *testing.T) {
 		pq.Int64Array([]int64{21}), pq.StringArray([]string{"212121"}), pq.StringArray([]string{"upokt"})).
 		WillReturnError(errors.New("dummy error"))
 
-	err = driver.WriteAccounts([]*indexer.Account{
+	err = driver.WriteAccounts([]*types.Account{
 		{
 			Address:             "00353abd21ef72725b295ba5a9a5eb6082548e21",
 			Height:              21,
@@ -65,7 +65,7 @@ func TestPostgresDriver_ReadAccountByAddress(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	account, err := driver.ReadAccountByAddress("00353abd21ef72725b295ba5a9a5eb6082548e21", &ReadAccountByAddressOptions{Height: 21})
+	account, err := driver.ReadAccountByAddress("00353abd21ef72725b295ba5a9a5eb6082548e21", &types.ReadAccountByAddressOptions{Height: 21})
 	c.NoError(err)
 	c.NotEmpty(account)
 
@@ -80,7 +80,7 @@ func TestPostgresDriver_ReadAccountByAddress(t *testing.T) {
 
 	mock.ExpectQuery("^SELECT (.+) FROM accounts (.+)").WillReturnError(errors.New("dummy error"))
 
-	account, err = driver.ReadAccountByAddress("00353abd21ef72725b295ba5a9a5eb6082548e21", &ReadAccountByAddressOptions{Height: 21})
+	account, err = driver.ReadAccountByAddress("00353abd21ef72725b295ba5a9a5eb6082548e21", &types.ReadAccountByAddressOptions{Height: 21})
 	c.EqualError(err, "dummy error")
 	c.Empty(account)
 
@@ -109,7 +109,7 @@ func TestPostgresDriver_ReadAccounts(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	accounts, err := driver.ReadAccounts(&ReadAccountsOptions{Page: 21, PerPage: 7, Height: 21})
+	accounts, err := driver.ReadAccounts(&types.ReadAccountsOptions{Page: 21, PerPage: 7, Height: 21})
 	c.NoError(err)
 	c.Len(accounts, 2)
 
@@ -117,7 +117,7 @@ func TestPostgresDriver_ReadAccounts(t *testing.T) {
 	mock.ExpectQuery(".*").WillReturnError(errors.New("dummy error"))
 	mock.ExpectCommit()
 
-	accounts, err = driver.ReadAccounts(&ReadAccountsOptions{})
+	accounts, err = driver.ReadAccounts(&types.ReadAccountsOptions{})
 	c.EqualError(err, "dummy error")
 	c.Empty(accounts)
 }
@@ -136,7 +136,7 @@ func TestPostgresDriver_GetAccountsQuantity(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	maxHeight, err := driver.GetAccountsQuantity(&GetAccountsQuantityOptions{Height: 21})
+	maxHeight, err := driver.GetAccountsQuantity(&types.GetAccountsQuantityOptions{Height: 21})
 	c.NoError(err)
 	c.Equal(int64(100), maxHeight)
 

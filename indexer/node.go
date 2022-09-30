@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/pokt-foundation/pocket-go/provider"
+	"github.com/pokt-foundation/pocket-indexer-lib/types"
 )
 
 var (
@@ -12,21 +13,11 @@ var (
 	ErrNoNodesToIndex = errors.New("no nodes to index")
 )
 
-// Node struct handler of all node fields to be indexed
-type Node struct {
-	Address    string
-	Height     int
-	Jailed     bool
-	PublicKey  string
-	ServiceURL string
-	Tokens     *big.Int
-}
-
-func convertProviderNodeToNode(height int, provNode *provider.Node) *Node {
+func convertProviderNodeToNode(height int, provNode *provider.Node) *types.Node {
 	tokens := new(big.Int)
 	tokens, _ = tokens.SetString(provNode.Tokens, 10)
 
-	return &Node{
+	return &types.Node{
 		Address:    provNode.Address,
 		Height:     height,
 		Jailed:     provNode.Jailed,
@@ -63,7 +54,7 @@ func (i *Indexer) IndexBlockNodes(blockHeight int) ([]string, error) {
 		return nil, ErrNoNodesToIndex
 	}
 
-	var nodes []*Node
+	var nodes []*types.Node
 	var addresses []string
 
 	for _, node := range providerNodes {
@@ -71,5 +62,5 @@ func (i *Indexer) IndexBlockNodes(blockHeight int) ([]string, error) {
 		addresses = append(addresses, node.Address)
 	}
 
-	return addresses, i.writer.WriteNodes(nodes)
+	return addresses, i.driver.WriteNodes(nodes)
 }

@@ -7,7 +7,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/lib/pq"
-	indexer "github.com/pokt-foundation/pocket-indexer-lib"
+	"github.com/pokt-foundation/pocket-indexer-lib/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,7 +26,7 @@ func TestPostgresDriver_WriteApps(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	appsToSend := []*indexer.App{
+	appsToSend := []*types.App{
 		{
 			Address:      "00353abd21ef72725b295ba5a9a5eb6082548e21",
 			Height:       21,
@@ -64,11 +64,11 @@ func TestPostgresDriver_ReadAppByAddress(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	app, err := driver.ReadAppByAddress("00353abd21ef72725b295ba5a9a5eb6082548e2", &ReadAppByAddressOptions{Height: 21})
+	app, err := driver.ReadAppByAddress("00353abd21ef72725b295ba5a9a5eb6082548e2", &types.ReadAppByAddressOptions{Height: 21})
 	c.Equal(ErrInvalidAddress, err)
 	c.Empty(app)
 
-	app, err = driver.ReadAppByAddress("00353abd21ef72725b295ba5a9a5eb6082548e21", &ReadAppByAddressOptions{Height: 21})
+	app, err = driver.ReadAppByAddress("00353abd21ef72725b295ba5a9a5eb6082548e21", &types.ReadAppByAddressOptions{Height: 21})
 	c.NoError(err)
 	c.NotEmpty(app)
 
@@ -84,7 +84,7 @@ func TestPostgresDriver_ReadAppByAddress(t *testing.T) {
 
 	mock.ExpectQuery("^SELECT (.+) FROM apps (.+)").WillReturnError(errors.New("dummy error"))
 
-	app, err = driver.ReadAppByAddress("00353abd21ef72725b295ba5a9a5eb6082548e21", &ReadAppByAddressOptions{Height: 21})
+	app, err = driver.ReadAppByAddress("00353abd21ef72725b295ba5a9a5eb6082548e21", &types.ReadAppByAddressOptions{Height: 21})
 	c.EqualError(err, "dummy error")
 	c.Empty(app)
 
@@ -115,7 +115,7 @@ func TestPostgresDriver_ReadApps(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	apps, err := driver.ReadApps(&ReadAppsOptions{Page: 21, PerPage: 7, Height: 21})
+	apps, err := driver.ReadApps(&types.ReadAppsOptions{Page: 21, PerPage: 7, Height: 21})
 	c.NoError(err)
 	c.Len(apps, 2)
 
@@ -123,7 +123,7 @@ func TestPostgresDriver_ReadApps(t *testing.T) {
 	mock.ExpectQuery(".*").WillReturnError(errors.New("dummy error"))
 	mock.ExpectCommit()
 
-	apps, err = driver.ReadApps(&ReadAppsOptions{})
+	apps, err = driver.ReadApps(&types.ReadAppsOptions{})
 	c.EqualError(err, "dummy error")
 	c.Empty(apps)
 }
@@ -142,7 +142,7 @@ func TestPostgresDriver_GetAppsQuantity(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	maxHeight, err := driver.GetAppsQuantity(&GetAppsQuantityOptions{Height: 21})
+	maxHeight, err := driver.GetAppsQuantity(&types.GetAppsQuantityOptions{Height: 21})
 	c.NoError(err)
 	c.Equal(int64(100), maxHeight)
 

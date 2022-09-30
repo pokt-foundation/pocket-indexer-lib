@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	indexer "github.com/pokt-foundation/pocket-indexer-lib"
+	"github.com/pokt-foundation/pocket-indexer-lib/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,7 +24,7 @@ func TestPostgresDriver_WriteBlock(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	err = driver.WriteBlock(&indexer.Block{
+	err = driver.WriteBlock(&types.Block{
 		Hash:            "AF5BB3EAFF431E2E5E784D639825979FF20A779725BFE61D4521340F70C3996D0",
 		Height:          21,
 		Time:            time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local),
@@ -38,7 +38,7 @@ func TestPostgresDriver_WriteBlock(t *testing.T) {
 		21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "A2143929B30CBC3E7A30C2DE06B385BCF874134B", 32, 100).
 		WillReturnError(errors.New("dummy error"))
 
-	err = driver.WriteBlock(&indexer.Block{
+	err = driver.WriteBlock(&types.Block{
 		Hash:            "AF5BB3EAFF431E2E5E784D639825979FF20A779725BFE61D4521340F70C3996D0",
 		Height:          21,
 		Time:            time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local),
@@ -67,7 +67,7 @@ func TestPostgresDriver_ReadBlocks(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	blocks, err := driver.ReadBlocks(&ReadBlocksOptions{Page: 1, PerPage: 7, Order: DescendantOrder})
+	blocks, err := driver.ReadBlocks(&types.ReadBlocksOptions{Page: 1, PerPage: 7, Order: types.DescendantOrder})
 	c.NoError(err)
 	c.Len(blocks, 2)
 	c.Equal(blocks[0].Hash, "ABCD")
@@ -76,7 +76,7 @@ func TestPostgresDriver_ReadBlocks(t *testing.T) {
 	mock.ExpectQuery(".*").WillReturnError(errors.New("dummy error"))
 	mock.ExpectCommit()
 
-	blocks, err = driver.ReadBlocks(&ReadBlocksOptions{})
+	blocks, err = driver.ReadBlocks(&types.ReadBlocksOptions{})
 	c.EqualError(err, "dummy error")
 	c.Empty(blocks)
 }

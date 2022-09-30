@@ -5,7 +5,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/pokt-foundation/pocket-go/utils"
-	indexer "github.com/pokt-foundation/pocket-indexer-lib"
+	"github.com/pokt-foundation/pocket-indexer-lib/types"
 )
 
 const (
@@ -40,11 +40,11 @@ type dbApp struct {
 	StakedTokens string `db:"staked_tokens"`
 }
 
-func (a *dbApp) toIndexerApp() *indexer.App {
+func (a *dbApp) toIndexerApp() *types.App {
 	stakedTokens := new(big.Int)
 	stakedTokens, _ = stakedTokens.SetString(a.StakedTokens, 10)
 
-	return &indexer.App{
+	return &types.App{
 		Address:      a.Address,
 		Height:       a.Height,
 		Jailed:       a.Jailed,
@@ -53,7 +53,7 @@ func (a *dbApp) toIndexerApp() *indexer.App {
 	}
 }
 
-func convertIndexerAppToDBApp(indexerApp *indexer.App) *dbApp {
+func convertIndexerAppToDBApp(indexerApp *types.App) *dbApp {
 	return &dbApp{
 		Address:      indexerApp.Address,
 		Height:       indexerApp.Height,
@@ -64,7 +64,7 @@ func convertIndexerAppToDBApp(indexerApp *indexer.App) *dbApp {
 }
 
 // WriteApps inserts given apps to the database
-func (d *PostgresDriver) WriteApps(apps []*indexer.App) error {
+func (d *PostgresDriver) WriteApps(apps []*types.App) error {
 	var addresses, publicKeys, allStakedTokens []string
 	var heights []int64
 	var jaileds []bool
@@ -90,13 +90,8 @@ func (d *PostgresDriver) WriteApps(apps []*indexer.App) error {
 	return nil
 }
 
-// ReadAppByAddressOptions optional parameters for ReadAppByAddress
-type ReadAppByAddressOptions struct {
-	Height int
-}
-
 // ReadAppByAddress returns an app in the database with given address
-func (d *PostgresDriver) ReadAppByAddress(address string, options *ReadAppByAddressOptions) (*indexer.App, error) {
+func (d *PostgresDriver) ReadAppByAddress(address string, options *types.ReadAppByAddressOptions) (*types.App, error) {
 	if !utils.ValidateAddress(address) {
 		return nil, ErrInvalidAddress
 	}
@@ -123,16 +118,9 @@ func (d *PostgresDriver) ReadAppByAddress(address string, options *ReadAppByAddr
 	return dbApp.toIndexerApp(), nil
 }
 
-// ReadAppsOptions optional parameters for ReadApps
-type ReadAppsOptions struct {
-	PerPage int
-	Page    int
-	Height  int
-}
-
 // ReadApps returns apps with given height
 // Optional values defaults: page: 1, perPage: 1000
-func (d *PostgresDriver) ReadApps(options *ReadAppsOptions) ([]*indexer.App, error) {
+func (d *PostgresDriver) ReadApps(options *types.ReadAppsOptions) ([]*types.App, error) {
 	perPage := defaultPerPage
 	page := defaultPage
 	height := 0
@@ -165,7 +153,7 @@ func (d *PostgresDriver) ReadApps(options *ReadAppsOptions) ([]*indexer.App, err
 		return nil, err
 	}
 
-	var indexerApps []*indexer.App
+	var indexerApps []*types.App
 
 	for _, dbApp := range apps {
 		indexerApps = append(indexerApps, dbApp.toIndexerApp())
@@ -174,14 +162,9 @@ func (d *PostgresDriver) ReadApps(options *ReadAppsOptions) ([]*indexer.App, err
 	return indexerApps, nil
 }
 
-// GetAppsQuantityOptions optinal params for GetAppsQuantity
-type GetAppsQuantityOptions struct {
-	Height int
-}
-
 // GetAppsQuantity returns quantity of apps with given height saved
 // default height is last height
-func (d *PostgresDriver) GetAppsQuantity(options *GetAppsQuantityOptions) (int64, error) {
+func (d *PostgresDriver) GetAppsQuantity(options *types.GetAppsQuantityOptions) (int64, error) {
 	var height int
 
 	if options != nil {

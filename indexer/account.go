@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/pokt-foundation/pocket-go/provider"
+	"github.com/pokt-foundation/pocket-indexer-lib/types"
 )
 
 var (
@@ -12,15 +13,7 @@ var (
 	ErrNoAccountsToIndex = errors.New("no accounts to index")
 )
 
-// Account struct handler of all account fields to be indexed
-type Account struct {
-	Address             string
-	Height              int
-	Balance             *big.Int
-	BalanceDenomination string
-}
-
-func convertProviderAccountToAccount(height int, providerAccount *provider.GetAccountOutput) *Account {
+func convertProviderAccountToAccount(height int, providerAccount *provider.GetAccountOutput) *types.Account {
 	var balanceDenomination string
 	balance := new(big.Int)
 
@@ -30,7 +23,7 @@ func convertProviderAccountToAccount(height int, providerAccount *provider.GetAc
 		balanceDenomination = coins.Denom
 	}
 
-	return &Account{
+	return &types.Account{
 		Address:             providerAccount.Address,
 		Height:              height,
 		Balance:             balance,
@@ -65,7 +58,7 @@ func (i *Indexer) IndexAccounts(blockHeight int) ([]string, error) {
 		return nil, ErrNoAccountsToIndex
 	}
 
-	var accounts []*Account
+	var accounts []*types.Account
 	var addresses []string
 
 	for _, account := range providerAccounts {
@@ -73,5 +66,5 @@ func (i *Indexer) IndexAccounts(blockHeight int) ([]string, error) {
 		addresses = append(addresses, account.Address)
 	}
 
-	return addresses, i.writer.WriteAccounts(accounts)
+	return addresses, i.driver.WriteAccounts(accounts)
 }

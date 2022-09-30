@@ -26,21 +26,21 @@ func TestIndexer_IndexAccounts(t *testing.T) {
 	indexer := NewIndexer(reqProvider, writerMock)
 
 	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryAccountsRoute),
-		http.StatusInternalServerError, "samples/query_accounts.json")
+		http.StatusInternalServerError, "../samples/query_accounts.json")
 
 	addresses, err := indexer.IndexAccounts(30363)
 	c.Equal(provider.Err5xxOnConnection, err)
 	c.Empty(addresses)
 
 	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryAccountsRoute),
-		http.StatusOK, "samples/query_accounts_empty.json")
+		http.StatusOK, "../samples/query_accounts_empty.json")
 
 	addresses, err = indexer.IndexAccounts(30363)
 	c.Equal(ErrNoAccountsToIndex, err)
 	c.Empty(addresses)
 
 	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryAccountsRoute),
-		http.StatusOK, "samples/query_accounts.json")
+		http.StatusOK, "../samples/query_accounts.json")
 
 	writerMock.On("WriteAccounts", testMock.Anything).Return(errors.New("forced failure")).Once()
 

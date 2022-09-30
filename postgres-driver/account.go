@@ -4,7 +4,7 @@ import (
 	"math/big"
 
 	"github.com/lib/pq"
-	indexer "github.com/pokt-foundation/pocket-indexer-lib"
+	"github.com/pokt-foundation/pocket-indexer-lib/types"
 )
 
 const (
@@ -38,11 +38,11 @@ type dbAccount struct {
 	BalanceDenomination string `db:"balance_denomination"`
 }
 
-func (a *dbAccount) toIndexerAccount() *indexer.Account {
+func (a *dbAccount) toIndexerAccount() *types.Account {
 	balance := new(big.Int)
 	balance, _ = balance.SetString(a.Balance, 10)
 
-	return &indexer.Account{
+	return &types.Account{
 		Address:             a.Address,
 		Height:              a.Height,
 		Balance:             balance,
@@ -50,7 +50,7 @@ func (a *dbAccount) toIndexerAccount() *indexer.Account {
 	}
 }
 
-func convertIndexerAccountToDBAccount(indexerAccount *indexer.Account) *dbAccount {
+func convertIndexerAccountToDBAccount(indexerAccount *types.Account) *dbAccount {
 	return &dbAccount{
 		Address:             indexerAccount.Address,
 		Height:              indexerAccount.Height,
@@ -60,7 +60,7 @@ func convertIndexerAccountToDBAccount(indexerAccount *indexer.Account) *dbAccoun
 }
 
 // WriteAccounts inserts given accounts to the database
-func (d *PostgresDriver) WriteAccounts(accounts []*indexer.Account) error {
+func (d *PostgresDriver) WriteAccounts(accounts []*types.Account) error {
 	var addresses, balanceDenominations, balances []string
 	var heights []int64
 
@@ -83,13 +83,8 @@ func (d *PostgresDriver) WriteAccounts(accounts []*indexer.Account) error {
 	return nil
 }
 
-// ReadAccountByAddressOptions optional parameters for ReadAccountByAddress
-type ReadAccountByAddressOptions struct {
-	Height int
-}
-
 // ReadAccountByAddress returns an account in the database with given address
-func (d *PostgresDriver) ReadAccountByAddress(address string, options *ReadAccountByAddressOptions) (*indexer.Account, error) {
+func (d *PostgresDriver) ReadAccountByAddress(address string, options *types.ReadAccountByAddressOptions) (*types.Account, error) {
 	var dbAccount dbAccount
 	var height int
 
@@ -112,16 +107,9 @@ func (d *PostgresDriver) ReadAccountByAddress(address string, options *ReadAccou
 	return dbAccount.toIndexerAccount(), nil
 }
 
-// ReadAccountsOptions optional parameters for ReadAccounts
-type ReadAccountsOptions struct {
-	PerPage int
-	Page    int
-	Height  int
-}
-
 // ReadAccounts returns accounts with given height
 // Optional values defaults: page: 1, perPage: 1000, height: last height
-func (d *PostgresDriver) ReadAccounts(options *ReadAccountsOptions) ([]*indexer.Account, error) {
+func (d *PostgresDriver) ReadAccounts(options *types.ReadAccountsOptions) ([]*types.Account, error) {
 	perPage := defaultPerPage
 	page := defaultPage
 	height := 0
@@ -154,7 +142,7 @@ func (d *PostgresDriver) ReadAccounts(options *ReadAccountsOptions) ([]*indexer.
 		return nil, err
 	}
 
-	var indexerAccounts []*indexer.Account
+	var indexerAccounts []*types.Account
 
 	for _, dbAccount := range accounts {
 		indexerAccounts = append(indexerAccounts, dbAccount.toIndexerAccount())
@@ -163,14 +151,9 @@ func (d *PostgresDriver) ReadAccounts(options *ReadAccountsOptions) ([]*indexer.
 	return indexerAccounts, nil
 }
 
-// GetAccountsQuantityOptions optional parameters for GetAccountsQuantity
-type GetAccountsQuantityOptions struct {
-	Height int
-}
-
 // GetAccountsQuantity returns quantity of accounts with given height saved
 // default height is last height
-func (d *PostgresDriver) GetAccountsQuantity(options *GetAccountsQuantityOptions) (int64, error) {
+func (d *PostgresDriver) GetAccountsQuantity(options *types.GetAccountsQuantityOptions) (int64, error) {
 	var height int
 
 	if options != nil {
