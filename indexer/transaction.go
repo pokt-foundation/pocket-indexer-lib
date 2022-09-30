@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/pokt-foundation/pocket-go/provider"
+	"github.com/pokt-foundation/pocket-indexer-lib/types"
 )
 
 var (
@@ -13,26 +14,7 @@ var (
 	ErrNoTransactionsToIndex = errors.New("no transactions to index")
 )
 
-// Transaction struct handler of all transaction fields to be indexed
-type Transaction struct {
-	Hash            string
-	FromAddress     string
-	ToAddress       string
-	AppPubKey       string
-	Blockchains     []string
-	MessageType     string
-	Height          int
-	Index           int
-	StdTx           *provider.StdTx
-	TxResult        *provider.TxResult
-	Tx              string
-	Entropy         int
-	Fee             int
-	FeeDenomination string
-	Amount          *big.Int
-}
-
-func convertProviderTransactionToTransaction(providerTransaction *provider.Transaction) *Transaction {
+func convertProviderTransactionToTransaction(providerTransaction *provider.Transaction) *types.Transaction {
 	var fromAddress, toAddress string
 	var blockChains []string
 
@@ -69,7 +51,7 @@ func convertProviderTransactionToTransaction(providerTransaction *provider.Trans
 
 	fee, _ := strconv.Atoi(feeStruct.Amount)
 
-	return &Transaction{
+	return &types.Transaction{
 		Hash:            providerTransaction.Hash,
 		FromAddress:     fromAddress,
 		ToAddress:       toAddress,
@@ -116,11 +98,11 @@ func (i *Indexer) IndexBlockTransactions(blockHeight int) error {
 		return ErrNoTransactionsToIndex
 	}
 
-	var transactions []*Transaction
+	var transactions []*types.Transaction
 
 	for _, tx := range providerTxs {
 		transactions = append(transactions, convertProviderTransactionToTransaction(tx))
 	}
 
-	return i.writer.WriteTransactions(transactions)
+	return i.driver.WriteTransactions(transactions)
 }

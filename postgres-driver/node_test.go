@@ -7,7 +7,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/lib/pq"
-	indexer "github.com/pokt-foundation/pocket-indexer-lib"
+	"github.com/pokt-foundation/pocket-indexer-lib/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,7 +26,7 @@ func TestPostgresDriver_WriteNodes(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	nodesToSend := []*indexer.Node{
+	nodesToSend := []*types.Node{
 		{
 			Address:    "00353abd21ef72725b295ba5a9a5eb6082548e21",
 			Height:     21,
@@ -65,11 +65,11 @@ func TestPostgresDriver_ReadNodeByAddress(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	node, err := driver.ReadNodeByAddress("00353abd21ef72725b295ba5a9a5eb6082548e2", &ReadNodeByAddressOptions{Height: 21})
+	node, err := driver.ReadNodeByAddress("00353abd21ef72725b295ba5a9a5eb6082548e2", &types.ReadNodeByAddressOptions{Height: 21})
 	c.Equal(ErrInvalidAddress, err)
 	c.Empty(node)
 
-	node, err = driver.ReadNodeByAddress("00353abd21ef72725b295ba5a9a5eb6082548e21", &ReadNodeByAddressOptions{Height: 21})
+	node, err = driver.ReadNodeByAddress("00353abd21ef72725b295ba5a9a5eb6082548e21", &types.ReadNodeByAddressOptions{Height: 21})
 	c.NoError(err)
 	c.NotEmpty(node)
 
@@ -85,7 +85,7 @@ func TestPostgresDriver_ReadNodeByAddress(t *testing.T) {
 
 	mock.ExpectQuery("^SELECT (.+) FROM nodes (.+)").WillReturnError(errors.New("dummy error"))
 
-	node, err = driver.ReadNodeByAddress("00353abd21ef72725b295ba5a9a5eb6082548e21", &ReadNodeByAddressOptions{Height: 21})
+	node, err = driver.ReadNodeByAddress("00353abd21ef72725b295ba5a9a5eb6082548e21", &types.ReadNodeByAddressOptions{Height: 21})
 	c.EqualError(err, "dummy error")
 	c.Empty(node)
 
@@ -116,7 +116,7 @@ func TestPostgresDriver_ReadNodes(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	nodes, err := driver.ReadNodes(&ReadNodesOptions{Page: 21, PerPage: 7, Height: 21})
+	nodes, err := driver.ReadNodes(&types.ReadNodesOptions{Page: 21, PerPage: 7, Height: 21})
 	c.NoError(err)
 	c.Len(nodes, 2)
 
@@ -124,7 +124,7 @@ func TestPostgresDriver_ReadNodes(t *testing.T) {
 	mock.ExpectQuery(".*").WillReturnError(errors.New("dummy error"))
 	mock.ExpectCommit()
 
-	nodes, err = driver.ReadNodes(&ReadNodesOptions{})
+	nodes, err = driver.ReadNodes(&types.ReadNodesOptions{})
 	c.EqualError(err, "dummy error")
 	c.Empty(nodes)
 }
@@ -143,7 +143,7 @@ func TestPostgresDriver_GetNodesQuantity(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	maxHeight, err := driver.GetNodesQuantity(&GetNodesQuantityOptions{Height: 21})
+	maxHeight, err := driver.GetNodesQuantity(&types.GetNodesQuantityOptions{Height: 21})
 	c.NoError(err)
 	c.Equal(int64(100), maxHeight)
 

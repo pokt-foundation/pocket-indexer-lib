@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/pokt-foundation/pocket-go/provider"
+	"github.com/pokt-foundation/pocket-indexer-lib/types"
 )
 
 var (
@@ -12,20 +13,11 @@ var (
 	ErrNoAppsToIndex = errors.New("no apps to index")
 )
 
-// App struct handler of all app fields to be indexed
-type App struct {
-	Address      string
-	Height       int
-	Jailed       bool
-	PublicKey    string
-	StakedTokens *big.Int
-}
-
-func convertProviderAppToApp(height int, provApp *provider.App) *App {
+func convertProviderAppToApp(height int, provApp *provider.App) *types.App {
 	stakedTokens := new(big.Int)
 	stakedTokens, _ = stakedTokens.SetString(provApp.StakedTokens, 10)
 
-	return &App{
+	return &types.App{
 		Address:      provApp.Address,
 		Height:       height,
 		Jailed:       provApp.Jailed,
@@ -61,7 +53,7 @@ func (i *Indexer) IndexBlockApps(blockHeight int) ([]string, error) {
 		return nil, ErrNoAppsToIndex
 	}
 
-	var apps []*App
+	var apps []*types.App
 	var addresses []string
 
 	for _, app := range providerApps {
@@ -69,5 +61,5 @@ func (i *Indexer) IndexBlockApps(blockHeight int) ([]string, error) {
 		addresses = append(addresses, app.Address)
 	}
 
-	return addresses, i.writer.WriteApps(apps)
+	return addresses, i.driver.WriteApps(apps)
 }

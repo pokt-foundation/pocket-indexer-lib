@@ -26,23 +26,23 @@ func TestIndexer_IndexBlockTransactions(t *testing.T) {
 	indexer := NewIndexer(reqProvider, writerMock)
 
 	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryBlockTXsRoute),
-		http.StatusInternalServerError, "samples/query_block_txs.json")
+		http.StatusInternalServerError, "../samples/query_block_txs.json")
 
 	err := indexer.IndexBlockTransactions(30363)
 	c.Equal(provider.Err5xxOnConnection, err)
 
 	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryBlockTXsRoute),
-		http.StatusOK, "samples/query_block_txs_empty.json")
+		http.StatusOK, "../samples/query_block_txs_empty.json")
 
 	err = indexer.IndexBlockTransactions(30363)
 	c.Equal(ErrNoTransactionsToIndex, err)
 
 	mock.AddMultipleMockedResponses(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryBlockTXsRoute),
 		http.StatusOK, []string{
-			"samples/query_block_txs.json",
-			"samples/query_block_txs_empty.json",
-			"samples/query_block_txs.json",
-			"samples/query_block_txs_empty.json",
+			"../samples/query_block_txs.json",
+			"../samples/query_block_txs_empty.json",
+			"../samples/query_block_txs.json",
+			"../samples/query_block_txs_empty.json",
 		})
 
 	writerMock.On("WriteTransactions", testMock.Anything).Return(errors.New("forced failure")).Once()

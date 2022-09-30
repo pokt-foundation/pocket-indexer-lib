@@ -8,7 +8,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/pokt-foundation/pocket-go/utils"
-	indexer "github.com/pokt-foundation/pocket-indexer-lib"
+	"github.com/pokt-foundation/pocket-indexer-lib/types"
 )
 
 const (
@@ -68,11 +68,11 @@ type dbTransaction struct {
 	Amount          string    `db:"amount"`
 }
 
-func (t *dbTransaction) toIndexerTransaction() *indexer.Transaction {
+func (t *dbTransaction) toIndexerTransaction() *types.Transaction {
 	amount := new(big.Int)
 	amount, _ = amount.SetString(t.Amount, 10)
 
-	return &indexer.Transaction{
+	return &types.Transaction{
 		Hash:            t.Hash,
 		FromAddress:     t.FromAddress.String,
 		ToAddress:       t.ToAddress.String,
@@ -91,7 +91,7 @@ func (t *dbTransaction) toIndexerTransaction() *indexer.Transaction {
 	}
 }
 
-func convertIndexerTransactionToDBTransaction(indexerTransaction *indexer.Transaction) *dbTransaction {
+func convertIndexerTransactionToDBTransaction(indexerTransaction *types.Transaction) *dbTransaction {
 	return &dbTransaction{
 		Hash:            indexerTransaction.Hash,
 		FromAddress:     newSQLNullString(indexerTransaction.FromAddress),
@@ -112,7 +112,7 @@ func convertIndexerTransactionToDBTransaction(indexerTransaction *indexer.Transa
 }
 
 // WriteTransactions inserts given transactions to the database
-func (d *PostgresDriver) WriteTransactions(txs []*indexer.Transaction) error {
+func (d *PostgresDriver) WriteTransactions(txs []*types.Transaction) error {
 	var hashes, appPubKeys, blockChains, messageTypes, txStrings, feeDenominations, amounts []string
 	var fromAddresses, toAddresses []sql.NullString
 	var heights, indexes, entropies, fees []int64
@@ -161,16 +161,9 @@ func (d *PostgresDriver) WriteTransactions(txs []*indexer.Transaction) error {
 	return nil
 }
 
-// ReadTransactionsOptions optional parameters for ReadTransactions
-type ReadTransactionsOptions struct {
-	PerPage int
-	Page    int
-	Order   Order
-}
-
 // ReadTransactions returns transactions on the database with pagination
 // Optional values defaults: page: 1, perPage: 1000
-func (d *PostgresDriver) ReadTransactions(options *ReadTransactionsOptions) ([]*indexer.Transaction, error) {
+func (d *PostgresDriver) ReadTransactions(options *types.ReadTransactionsOptions) ([]*types.Transaction, error) {
 	perPage := defaultPerPage
 	page := defaultPage
 	order := defaultOrder
@@ -202,7 +195,7 @@ func (d *PostgresDriver) ReadTransactions(options *ReadTransactionsOptions) ([]*
 		return nil, err
 	}
 
-	var indexerTransactions []*indexer.Transaction
+	var indexerTransactions []*types.Transaction
 
 	for _, dbTransaction := range transactions {
 		indexerTransactions = append(indexerTransactions, dbTransaction.toIndexerTransaction())
@@ -211,15 +204,9 @@ func (d *PostgresDriver) ReadTransactions(options *ReadTransactionsOptions) ([]*
 	return indexerTransactions, nil
 }
 
-// ReadTransactionsByAddressOptions optional parameters for ReadTransactionsByAddress
-type ReadTransactionsByAddressOptions struct {
-	PerPage int
-	Page    int
-}
-
 // ReadTransactionsByAddress returns transactions with given from address
 // Optional values defaults: page: 1, perPage: 1000
-func (d *PostgresDriver) ReadTransactionsByAddress(address string, options *ReadTransactionsByAddressOptions) ([]*indexer.Transaction, error) {
+func (d *PostgresDriver) ReadTransactionsByAddress(address string, options *types.ReadTransactionsByAddressOptions) ([]*types.Transaction, error) {
 	if !utils.ValidateAddress(address) {
 		return nil, ErrInvalidAddress
 	}
@@ -253,7 +240,7 @@ func (d *PostgresDriver) ReadTransactionsByAddress(address string, options *Read
 		return nil, err
 	}
 
-	var indexerTransactions []*indexer.Transaction
+	var indexerTransactions []*types.Transaction
 
 	for _, dbTransaction := range transactions {
 		indexerTransactions = append(indexerTransactions, dbTransaction.toIndexerTransaction())
@@ -262,16 +249,10 @@ func (d *PostgresDriver) ReadTransactionsByAddress(address string, options *Read
 	return indexerTransactions, nil
 }
 
-// ReadTransactionsByHeightOptions optional parameters for ReadTransactionsByHeight
-type ReadTransactionsByHeightOptions struct {
-	PerPage int
-	Page    int
-}
-
 // ReadTransactionsByHeight returns transactions with given height
 // height 0 is last height
 // Optional values defaults: page: 1, perPage: 1000
-func (d *PostgresDriver) ReadTransactionsByHeight(height int, options *ReadTransactionsByHeightOptions) ([]*indexer.Transaction, error) {
+func (d *PostgresDriver) ReadTransactionsByHeight(height int, options *types.ReadTransactionsByHeightOptions) ([]*types.Transaction, error) {
 	perPage := defaultPerPage
 	page := defaultPage
 
@@ -302,7 +283,7 @@ func (d *PostgresDriver) ReadTransactionsByHeight(height int, options *ReadTrans
 		return nil, err
 	}
 
-	var indexerTransactions []*indexer.Transaction
+	var indexerTransactions []*types.Transaction
 
 	for _, dbTransaction := range transactions {
 		indexerTransactions = append(indexerTransactions, dbTransaction.toIndexerTransaction())
@@ -312,7 +293,7 @@ func (d *PostgresDriver) ReadTransactionsByHeight(height int, options *ReadTrans
 }
 
 // ReadTransactionByHash returns transaction in the database with given transaction hash
-func (d *PostgresDriver) ReadTransactionByHash(hash string) (*indexer.Transaction, error) {
+func (d *PostgresDriver) ReadTransactionByHash(hash string) (*types.Transaction, error) {
 	var dbTransaction dbTransaction
 
 	err := d.Get(&dbTransaction, selectTransactionByHashScript, hash)

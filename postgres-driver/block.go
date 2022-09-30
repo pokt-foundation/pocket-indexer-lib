@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	indexer "github.com/pokt-foundation/pocket-indexer-lib"
+	"github.com/pokt-foundation/pocket-indexer-lib/types"
 )
 
 const (
@@ -35,8 +35,8 @@ type dbBlock struct {
 	TXTotal         int       `db:"tx_total"`
 }
 
-func (b *dbBlock) toIndexerBlock() *indexer.Block {
-	return &indexer.Block{
+func (b *dbBlock) toIndexerBlock() *types.Block {
+	return &types.Block{
 		Hash:            b.Hash,
 		Height:          b.Height,
 		Time:            b.Time,
@@ -46,7 +46,7 @@ func (b *dbBlock) toIndexerBlock() *indexer.Block {
 	}
 }
 
-func convertIndexerBlockToDBBlock(indexerBlock *indexer.Block) *dbBlock {
+func convertIndexerBlockToDBBlock(indexerBlock *types.Block) *dbBlock {
 	return &dbBlock{
 		Hash:            indexerBlock.Hash,
 		Height:          indexerBlock.Height,
@@ -58,7 +58,7 @@ func convertIndexerBlockToDBBlock(indexerBlock *indexer.Block) *dbBlock {
 }
 
 // WriteBlock inserts given block to the database
-func (d *PostgresDriver) WriteBlock(block *indexer.Block) error {
+func (d *PostgresDriver) WriteBlock(block *types.Block) error {
 	dbBlock := convertIndexerBlockToDBBlock(block)
 
 	_, err := d.NamedExec(insertBlockScript, dbBlock)
@@ -69,16 +69,9 @@ func (d *PostgresDriver) WriteBlock(block *indexer.Block) error {
 	return nil
 }
 
-// ReadBlocksOptions optional parameters for ReadBlocks
-type ReadBlocksOptions struct {
-	PerPage int
-	Page    int
-	Order   Order
-}
-
 // ReadBlocks returns all blocks on the database with pagination
 // Optional values defaults: page: 1, perPage: 1000
-func (d *PostgresDriver) ReadBlocks(options *ReadBlocksOptions) ([]*indexer.Block, error) {
+func (d *PostgresDriver) ReadBlocks(options *types.ReadBlocksOptions) ([]*types.Block, error) {
 	perPage := defaultPerPage
 	page := defaultPage
 	order := defaultOrder
@@ -110,7 +103,7 @@ func (d *PostgresDriver) ReadBlocks(options *ReadBlocksOptions) ([]*indexer.Bloc
 		return nil, err
 	}
 
-	var indexerBlocks []*indexer.Block
+	var indexerBlocks []*types.Block
 
 	for _, block := range blocks {
 		indexerBlocks = append(indexerBlocks, block.toIndexerBlock())
@@ -120,7 +113,7 @@ func (d *PostgresDriver) ReadBlocks(options *ReadBlocksOptions) ([]*indexer.Bloc
 }
 
 // ReadBlockByHash returns block in the database with given block hash
-func (d *PostgresDriver) ReadBlockByHash(hash string) (*indexer.Block, error) {
+func (d *PostgresDriver) ReadBlockByHash(hash string) (*types.Block, error) {
 	var dbBlock dbBlock
 
 	err := d.Get(&dbBlock, selectBlockByHashScript, hash)
@@ -133,7 +126,7 @@ func (d *PostgresDriver) ReadBlockByHash(hash string) (*indexer.Block, error) {
 
 // ReadBlockByHeight returns block in the database with given height
 // height 0 is last height
-func (d *PostgresDriver) ReadBlockByHeight(height int) (*indexer.Block, error) {
+func (d *PostgresDriver) ReadBlockByHeight(height int) (*types.Block, error) {
 	var dbBlock dbBlock
 
 	if height == 0 {

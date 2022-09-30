@@ -3,9 +3,9 @@ package indexer
 import (
 	"errors"
 	"strconv"
-	"time"
 
 	"github.com/pokt-foundation/pocket-go/provider"
+	"github.com/pokt-foundation/pocket-indexer-lib/types"
 )
 
 var (
@@ -13,24 +13,14 @@ var (
 	ErrBlockHasNoHash = errors.New("block to index has no hash")
 )
 
-// Block struct handler of all block fields to be indexed
-type Block struct {
-	Hash            string
-	Height          int
-	Time            time.Time
-	ProposerAddress string
-	TXCount         int
-	TXTotal         int
-}
-
-func convertProviderBlockToBlock(providerBlock *provider.GetBlockOutput) *Block {
+func convertProviderBlockToBlock(providerBlock *provider.GetBlockOutput) *types.Block {
 	blockHeader := providerBlock.Block.Header
 
 	height, _ := strconv.Atoi(blockHeader.Height)
 	countTx, _ := strconv.Atoi(blockHeader.NumTxs)
 	totalTxs, _ := strconv.Atoi(blockHeader.TotalTxs)
 
-	return &Block{
+	return &types.Block{
 		Hash:            providerBlock.BlockID.Hash,
 		Height:          height,
 		Time:            blockHeader.Time,
@@ -51,5 +41,5 @@ func (i *Indexer) IndexBlock(blockHeight int) error {
 		return ErrBlockHasNoHash
 	}
 
-	return i.writer.WriteBlock(convertProviderBlockToBlock(blockOutput))
+	return i.driver.WriteBlock(convertProviderBlockToBlock(blockOutput))
 }

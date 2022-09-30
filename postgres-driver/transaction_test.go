@@ -10,7 +10,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/lib/pq"
 	"github.com/pokt-foundation/pocket-go/provider"
-	indexer "github.com/pokt-foundation/pocket-indexer-lib"
+	"github.com/pokt-foundation/pocket-indexer-lib/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -68,7 +68,7 @@ func TestPostgresDriver_WriteTransactions(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	transactionToSend := []*indexer.Transaction{
+	transactionToSend := []*types.Transaction{
 		{
 			Hash:            "AF5BB3EAFF431E2E5E784D639825979FF20A779725BFE61D4521340F70C3996D0",
 			FromAddress:     "addssd",
@@ -123,7 +123,7 @@ func TestPostgresDriver_ReadTransactions(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	transactions, err := driver.ReadTransactions(&ReadTransactionsOptions{Page: 2, PerPage: 3})
+	transactions, err := driver.ReadTransactions(&types.ReadTransactionsOptions{Page: 2, PerPage: 3})
 	c.NoError(err)
 	c.Len(transactions, 2)
 
@@ -168,11 +168,11 @@ func TestPostgresDriver_ReadTransactionsByAddress(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	transactions, err := driver.ReadTransactionsByAddress(";DROP DATABASE;", &ReadTransactionsByAddressOptions{Page: 2, PerPage: 3})
+	transactions, err := driver.ReadTransactionsByAddress(";DROP DATABASE;", &types.ReadTransactionsByAddressOptions{Page: 2, PerPage: 3})
 	c.Equal(ErrInvalidAddress, err)
 	c.Empty(transactions)
 
-	transactions, err = driver.ReadTransactionsByAddress("1f32488b1db60fe528ab21e3cc26c96696be3faa", &ReadTransactionsByAddressOptions{Page: 2, PerPage: 3})
+	transactions, err = driver.ReadTransactionsByAddress("1f32488b1db60fe528ab21e3cc26c96696be3faa", &types.ReadTransactionsByAddressOptions{Page: 2, PerPage: 3})
 	c.NoError(err)
 	c.Len(transactions, 2)
 
@@ -217,7 +217,7 @@ func TestPostgresDriver_ReadTransactionsByHeight(t *testing.T) {
 
 	driver := NewPostgresDriverFromSQLDBInstance(db)
 
-	transactions, err := driver.ReadTransactionsByHeight(21, &ReadTransactionsByHeightOptions{Page: 2, PerPage: 3})
+	transactions, err := driver.ReadTransactionsByHeight(21, &types.ReadTransactionsByHeightOptions{Page: 2, PerPage: 3})
 	c.NoError(err)
 	c.Len(transactions, 2)
 

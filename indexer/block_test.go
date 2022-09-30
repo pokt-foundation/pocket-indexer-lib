@@ -26,19 +26,19 @@ func TestIndexer_IndexBlock(t *testing.T) {
 	indexer := NewIndexer(reqProvider, writerMock)
 
 	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryBlockRoute),
-		http.StatusInternalServerError, "samples/query_block.json")
+		http.StatusInternalServerError, "../samples/query_block.json")
 
 	err := indexer.IndexBlock(30363)
 	c.Equal(provider.Err5xxOnConnection, err)
 
 	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryBlockRoute),
-		http.StatusOK, "samples/query_block_empty.json")
+		http.StatusOK, "../samples/query_block_empty.json")
 
 	err = indexer.IndexBlock(30363)
 	c.Equal(ErrBlockHasNoHash, err)
 
 	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryBlockRoute),
-		http.StatusOK, "samples/query_block.json")
+		http.StatusOK, "../samples/query_block.json")
 
 	writerMock.On("WriteBlock", testMock.Anything).Return(errors.New("forced failure")).Once()
 

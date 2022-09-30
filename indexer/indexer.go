@@ -3,6 +3,7 @@ package indexer
 
 import (
 	"github.com/pokt-foundation/pocket-go/provider"
+	"github.com/pokt-foundation/pocket-indexer-lib/types"
 )
 
 // Provider interface of needed provider functions
@@ -14,25 +15,25 @@ type Provider interface {
 	GetApps(options *provider.GetAppsOptions) (*provider.GetAppsOutput, error)
 }
 
-// Writer interface for write methods to index
-type Writer interface {
-	WriteBlock(block *Block) error
-	WriteTransactions(txs []*Transaction) error
-	WriteAccounts(accounts []*Account) error
-	WriteNodes(nodes []*Node) error
-	WriteApps(apps []*App) error
+// Driver interface for driver methods needed to index
+type Driver interface {
+	WriteBlock(block *types.Block) error
+	WriteTransactions(txs []*types.Transaction) error
+	WriteAccounts(accounts []*types.Account) error
+	WriteNodes(nodes []*types.Node) error
+	WriteApps(apps []*types.App) error
 }
 
 // Indexer struct handler for Indexer functions
 type Indexer struct {
 	provider Provider
-	writer   Writer
+	driver   Driver
 }
 
 // NewIndexer returns Indexer instance with given input
-func NewIndexer(provider Provider, writer Writer) *Indexer {
+func NewIndexer(provider Provider, writer Driver) *Indexer {
 	return &Indexer{
 		provider: provider,
-		writer:   writer,
+		driver:   writer,
 	}
 }

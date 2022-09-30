@@ -5,7 +5,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/pokt-foundation/pocket-go/utils"
-	indexer "github.com/pokt-foundation/pocket-indexer-lib"
+	"github.com/pokt-foundation/pocket-indexer-lib/types"
 )
 
 const (
@@ -41,11 +41,11 @@ type dbNode struct {
 	Tokens     string `db:"tokens"`
 }
 
-func (n *dbNode) toIndexerNode() *indexer.Node {
+func (n *dbNode) toIndexerNode() *types.Node {
 	tokens := new(big.Int)
 	tokens, _ = tokens.SetString(n.Tokens, 10)
 
-	return &indexer.Node{
+	return &types.Node{
 		Address:    n.Address,
 		Height:     n.Height,
 		Jailed:     n.Jailed,
@@ -55,7 +55,7 @@ func (n *dbNode) toIndexerNode() *indexer.Node {
 	}
 }
 
-func convertIndexerNodeToDBNode(indexerNode *indexer.Node) *dbNode {
+func convertIndexerNodeToDBNode(indexerNode *types.Node) *dbNode {
 	return &dbNode{
 		Address:    indexerNode.Address,
 		Height:     indexerNode.Height,
@@ -67,7 +67,7 @@ func convertIndexerNodeToDBNode(indexerNode *indexer.Node) *dbNode {
 }
 
 // WriteNodes inserts given nodes to the database
-func (d *PostgresDriver) WriteNodes(nodes []*indexer.Node) error {
+func (d *PostgresDriver) WriteNodes(nodes []*types.Node) error {
 	var addresses, publicKeys, serviceURLs, allTokens []string
 	var heights []int64
 	var jaileds []bool
@@ -95,13 +95,8 @@ func (d *PostgresDriver) WriteNodes(nodes []*indexer.Node) error {
 	return nil
 }
 
-// ReadNodeByAddressOptions optional parameters for ReadNodeByAddress
-type ReadNodeByAddressOptions struct {
-	Height int
-}
-
 // ReadNodeByAddress returns a node in the database with given address
-func (d *PostgresDriver) ReadNodeByAddress(address string, options *ReadNodeByAddressOptions) (*indexer.Node, error) {
+func (d *PostgresDriver) ReadNodeByAddress(address string, options *types.ReadNodeByAddressOptions) (*types.Node, error) {
 	if !utils.ValidateAddress(address) {
 		return nil, ErrInvalidAddress
 	}
@@ -128,16 +123,9 @@ func (d *PostgresDriver) ReadNodeByAddress(address string, options *ReadNodeByAd
 	return dbNode.toIndexerNode(), nil
 }
 
-// ReadNodesOptions optional parameters for ReadNodes
-type ReadNodesOptions struct {
-	PerPage int
-	Page    int
-	Height  int
-}
-
 // ReadNodes returns nodes with given height
 // Optional values defaults: page: 1, perPage: 1000, height: last height
-func (d *PostgresDriver) ReadNodes(options *ReadNodesOptions) ([]*indexer.Node, error) {
+func (d *PostgresDriver) ReadNodes(options *types.ReadNodesOptions) ([]*types.Node, error) {
 	perPage := defaultPerPage
 	page := defaultPage
 	height := 0
@@ -170,7 +158,7 @@ func (d *PostgresDriver) ReadNodes(options *ReadNodesOptions) ([]*indexer.Node, 
 		return nil, err
 	}
 
-	var indexerNodes []*indexer.Node
+	var indexerNodes []*types.Node
 
 	for _, dbNode := range nodes {
 		indexerNodes = append(indexerNodes, dbNode.toIndexerNode())
@@ -179,14 +167,9 @@ func (d *PostgresDriver) ReadNodes(options *ReadNodesOptions) ([]*indexer.Node, 
 	return indexerNodes, nil
 }
 
-// GetNodesQuantityOptions optinal params for GetNodesQuantity
-type GetNodesQuantityOptions struct {
-	Height int
-}
-
 // GetNodesQuantity returns quantity of nodes with given height saved
 // default height is last height
-func (d *PostgresDriver) GetNodesQuantity(options *GetNodesQuantityOptions) (int64, error) {
+func (d *PostgresDriver) GetNodesQuantity(options *types.GetNodesQuantityOptions) (int64, error) {
 	var height int
 
 	if options != nil {
