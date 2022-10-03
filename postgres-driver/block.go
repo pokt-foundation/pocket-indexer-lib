@@ -12,6 +12,10 @@ const (
 	insertBlockScript = `
 	INSERT into blocks (hash, height, time, proposer_address, tx_count, tx_total)
 	VALUES (:hash, :height, :time, :proposer_address, :tx_count, :tx_total)`
+	updateBlockCalculatedFieldsScript = `
+	UPDATE blocks
+	SET accounts_quantity = :accounts_quantity, apps_quantity = :apps_quantity, nodes_quantity = :nodes_quantity, took = :took
+	WHERE height = :height`
 	selectBlocksScript = `
 	DECLARE blocks_cursor CURSOR FOR SELECT * FROM blocks ORDER BY height %s;
 	MOVE absolute %d from blocks_cursor;
@@ -26,23 +30,31 @@ const (
 
 // dbBlock is struct handler for the block with types needed for Postgres processing
 type dbBlock struct {
-	ID              int       `db:"id"`
-	Hash            string    `db:"hash"`
-	Height          int       `db:"height"`
-	Time            time.Time `db:"time"`
-	ProposerAddress string    `db:"proposer_address"`
-	TXCount         int       `db:"tx_count"`
-	TXTotal         int       `db:"tx_total"`
+	ID               int       `db:"id"`
+	Hash             string    `db:"hash"`
+	Height           int       `db:"height"`
+	Time             time.Time `db:"time"`
+	ProposerAddress  string    `db:"proposer_address"`
+	TXCount          int       `db:"tx_count"`
+	TXTotal          int       `db:"tx_total"`
+	AccountsQuantity int       `db:"accounts_quantity"`
+	AppsQuantity     int       `db:"apps_quantity"`
+	NodesQuantity    int       `db:"nodes_quantity"`
+	Took             int       `db:"took"`
 }
 
 func (b *dbBlock) toIndexerBlock() *types.Block {
 	return &types.Block{
-		Hash:            b.Hash,
-		Height:          b.Height,
-		Time:            b.Time,
-		ProposerAddress: b.ProposerAddress,
-		TXCount:         b.TXCount,
-		TXTotal:         b.TXTotal,
+		Hash:             b.Hash,
+		Height:           b.Height,
+		Time:             b.Time,
+		ProposerAddress:  b.ProposerAddress,
+		TXCount:          b.TXCount,
+		TXTotal:          b.TXTotal,
+		AccountsQuantity: b.AccountsQuantity,
+		AppsQuantity:     b.AppsQuantity,
+		NodesQuantity:    b.NodesQuantity,
+		Took:             time.Duration(b.Took),
 	}
 }
 
@@ -62,6 +74,35 @@ func (d *PostgresDriver) WriteBlock(block *types.Block) error {
 	dbBlock := convertIndexerBlockToDBBlock(block)
 
 	_, err := d.NamedExec(insertBlockScript, dbBlock)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type updateBlockCalculatedFields struct {
+	Height           int `db:"height"`
+	AccountsQuantity int `db:"accounts_quantity"`
+	AppsQuantity     int `db:"apps_quantity"`
+	NodesQuantity    int `db:"nodes_quantity"`
+	Took             int `db:"took"`
+}
+
+func extractCalculatedFields(block *types.Block) *updateBlockCalculatedFields {
+	return &updateBlockCalculatedFields{
+		Height:           block.Height,
+		AccountsQuantity: block.AccountsQuantity,
+		AppsQuantity:     block.AppsQuantity,
+		NodesQuantity:    block.NodesQuantity,
+		Took:             int(block.Took),
+	}
+}
+
+func (d *PostgresDriver) WriteBlockCalculatedFields(block *types.Block) error {
+	calculatedFields := extractCalculatedFields(block)
+
+	_, err := d.NamedExec(updateBlockCalculatedFieldsScript, calculatedFields)
 	if err != nil {
 		return err
 	}

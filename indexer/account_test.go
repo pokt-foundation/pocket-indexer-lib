@@ -21,9 +21,9 @@ func TestIndexer_IndexAccounts(t *testing.T) {
 
 	reqProvider := provider.NewProvider("https://dummy.com", []string{})
 
-	writerMock := &writerMock{}
+	driverMock := &driverMock{}
 
-	indexer := NewIndexer(reqProvider, writerMock)
+	indexer := NewIndexer(reqProvider, driverMock)
 
 	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryAccountsRoute),
 		http.StatusInternalServerError, "../samples/query_accounts.json")
@@ -42,14 +42,14 @@ func TestIndexer_IndexAccounts(t *testing.T) {
 	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryAccountsRoute),
 		http.StatusOK, "../samples/query_accounts.json")
 
-	writerMock.On("WriteAccounts", testMock.Anything).Return(errors.New("forced failure")).Once()
+	driverMock.On("WriteAccounts", testMock.Anything).Return(errors.New("forced failure")).Once()
 
 	addresses, err = indexer.IndexAccounts(30363)
 	c.EqualError(err, "forced failure")
 	c.Len(addresses, 1)
 	c.Equal("98a18a38aa6826a55dccce19f607e3171cf14366", addresses[0])
 
-	writerMock.On("WriteAccounts", testMock.Anything).Return(nil).Once()
+	driverMock.On("WriteAccounts", testMock.Anything).Return(nil).Once()
 
 	addresses, err = indexer.IndexAccounts(30363)
 	c.NoError(err)

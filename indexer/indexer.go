@@ -22,6 +22,14 @@ type Driver interface {
 	WriteAccounts(accounts []*types.Account) error
 	WriteNodes(nodes []*types.Node) error
 	WriteApps(apps []*types.App) error
+
+	GetAccountsQuantity(options *types.GetAccountsQuantityOptions) (int64, error)
+	GetAppsQuantity(options *types.GetAppsQuantityOptions) (int64, error)
+	GetNodesQuantity(options *types.GetNodesQuantityOptions) (int64, error)
+
+	ReadBlockByHeight(height int) (*types.Block, error)
+
+	WriteBlockCalculatedFields(block *types.Block) error
 }
 
 // Indexer struct handler for Indexer functions
