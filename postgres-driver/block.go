@@ -3,6 +3,7 @@ package postgresdriver
 import (
 	"database/sql"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/pokt-foundation/pocket-indexer-lib/types"
@@ -40,10 +41,12 @@ type dbBlock struct {
 	AccountsQuantity int       `db:"accounts_quantity"`
 	AppsQuantity     int       `db:"apps_quantity"`
 	NodesQuantity    int       `db:"nodes_quantity"`
-	Took             int       `db:"took"`
+	Took             string    `db:"took"`
 }
 
 func (b *dbBlock) toIndexerBlock() *types.Block {
+	took, _ := strconv.Atoi(b.Took)
+
 	return &types.Block{
 		Hash:             b.Hash,
 		Height:           b.Height,
@@ -54,7 +57,7 @@ func (b *dbBlock) toIndexerBlock() *types.Block {
 		AccountsQuantity: b.AccountsQuantity,
 		AppsQuantity:     b.AppsQuantity,
 		NodesQuantity:    b.NodesQuantity,
-		Took:             time.Duration(b.Took),
+		Took:             time.Duration(took),
 	}
 }
 
@@ -82,11 +85,11 @@ func (d *PostgresDriver) WriteBlock(block *types.Block) error {
 }
 
 type updateBlockCalculatedFields struct {
-	Height           int `db:"height"`
-	AccountsQuantity int `db:"accounts_quantity"`
-	AppsQuantity     int `db:"apps_quantity"`
-	NodesQuantity    int `db:"nodes_quantity"`
-	Took             int `db:"took"`
+	Height           int    `db:"height"`
+	AccountsQuantity int    `db:"accounts_quantity"`
+	AppsQuantity     int    `db:"apps_quantity"`
+	NodesQuantity    int    `db:"nodes_quantity"`
+	Took             string `db:"took"`
 }
 
 func extractCalculatedFields(block *types.Block) *updateBlockCalculatedFields {
@@ -95,7 +98,7 @@ func extractCalculatedFields(block *types.Block) *updateBlockCalculatedFields {
 		AccountsQuantity: block.AccountsQuantity,
 		AppsQuantity:     block.AppsQuantity,
 		NodesQuantity:    block.NodesQuantity,
-		Took:             int(block.Took),
+		Took:             strconv.Itoa(int(block.Took)),
 	}
 }
 
