@@ -45,6 +45,9 @@ func (i *Indexer) IndexBlock(blockHeight int) error {
 	return i.driver.WriteBlock(convertProviderBlockToBlock(blockOutput))
 }
 
+// IndexBlockCalculatedFields indexes calculated fields for block in given height
+// Calculated fields are accounts, apps and nodes quantities and took
+// getTook input is necessary for custom indexing (first height won't have the previous block to calculate took value)
 func (i *Indexer) IndexBlockCalculatedFields(blockHeight int, getTook bool) error {
 	accountsQuantity, err := i.driver.GetAccountsQuantity(&types.GetAccountsQuantityOptions{
 		Height: blockHeight,

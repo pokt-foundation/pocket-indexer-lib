@@ -102,6 +102,7 @@ func extractCalculatedFields(block *types.Block) *updateBlockCalculatedFields {
 	}
 }
 
+// WriteBlockCalculatedFields writes block calculated fields (quantities and took)
 func (d *PostgresDriver) WriteBlockCalculatedFields(block *types.Block) error {
 	calculatedFields := extractCalculatedFields(block)
 
