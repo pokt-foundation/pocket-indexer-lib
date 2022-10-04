@@ -49,6 +49,41 @@ func TestPostgresDriver_WriteBlock(t *testing.T) {
 	c.EqualError(err, "dummy error")
 }
 
+func TestPostgresDriver_WriteBlockCalculatedFields(t *testing.T) {
+	c := require.New(t)
+
+	db, mock, err := sqlmock.New()
+	c.NoError(err)
+
+	defer db.Close()
+
+	mock.ExpectExec("UPDATE blocks").WithArgs(212121, 2121, 2323, "2121", 21).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	driver := NewPostgresDriverFromSQLDBInstance(db)
+
+	err = driver.WriteBlockCalculatedFields(&types.Block{
+		Height:           21,
+		AccountsQuantity: 212121,
+		AppsQuantity:     2121,
+		NodesQuantity:    2323,
+		Took:             2121,
+	})
+	c.NoError(err)
+
+	mock.ExpectExec("UPDATE blocks").WithArgs(212121, 2121, 2323, "2121", 21).
+		WillReturnError(errors.New("dummy error"))
+
+	err = driver.WriteBlockCalculatedFields(&types.Block{
+		Height:           21,
+		AccountsQuantity: 212121,
+		AppsQuantity:     2121,
+		NodesQuantity:    2323,
+		Took:             2121,
+	})
+	c.EqualError(err, "dummy error")
+}
+
 func TestPostgresDriver_ReadBlocks(t *testing.T) {
 	c := require.New(t)
 
@@ -57,9 +92,10 @@ func TestPostgresDriver_ReadBlocks(t *testing.T) {
 
 	defer db.Close()
 
-	rows := sqlmock.NewRows([]string{"id", "hash", "height", "time", "proposer_address", "tx_count", "tx_total"}).
-		AddRow(1, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21, 100).
-		AddRow(1, "EDFG", 22, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21, 100)
+	rows := sqlmock.NewRows([]string{"id", "hash", "height", "time", "proposer_address", "tx_count", "tx_total",
+		"accounts_quantity", "apps_quantity", "nodes_quantity", "took"}).
+		AddRow(1, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21, 100, 212121, 2121, 2323, "2121").
+		AddRow(1, "EDFG", 22, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21, 100, 212121, 2121, 2323, "2121")
 
 	mock.ExpectBegin()
 	mock.ExpectQuery(".*").WillReturnRows(rows)
@@ -89,8 +125,9 @@ func TestPostgresDriver_ReadBlockByHash(t *testing.T) {
 
 	defer db.Close()
 
-	rows := sqlmock.NewRows([]string{"id", "hash", "height", "time", "proposer_address", "tx_count", "tx_total"}).
-		AddRow(1, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21, 100)
+	rows := sqlmock.NewRows([]string{"id", "hash", "height", "time", "proposer_address", "tx_count", "tx_total",
+		"accounts_quantity", "apps_quantity", "nodes_quantity", "took"}).
+		AddRow(1, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21, 100, 212121, 2121, 2323, "2121")
 
 	mock.ExpectQuery("^SELECT (.+) FROM blocks (.+)").WillReturnRows(rows)
 
@@ -115,8 +152,9 @@ func TestPostgresDriver_ReadBlockByHeight(t *testing.T) {
 
 	defer db.Close()
 
-	rows := sqlmock.NewRows([]string{"id", "hash", "height", "time", "proposer_address", "tx_count", "tx_total"}).
-		AddRow(1, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21, 100)
+	rows := sqlmock.NewRows([]string{"id", "hash", "height", "time", "proposer_address", "tx_count", "tx_total",
+		"accounts_quantity", "apps_quantity", "nodes_quantity", "took"}).
+		AddRow(1, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21, 100, 212121, 2121, 2323, "2121")
 
 	mock.ExpectQuery("^SELECT (.+) FROM blocks (.+)").WillReturnRows(rows)
 
@@ -126,8 +164,9 @@ func TestPostgresDriver_ReadBlockByHeight(t *testing.T) {
 	c.NoError(err)
 	c.NotEmpty(block)
 
-	rows = sqlmock.NewRows([]string{"id", "hash", "height", "time", "proposer_address", "tx_count", "tx_total"}).
-		AddRow(1, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21, 100)
+	rows = sqlmock.NewRows([]string{"id", "hash", "height", "time", "proposer_address", "tx_count", "tx_total",
+		"accounts_quantity", "apps_quantity", "nodes_quantity", "took"}).
+		AddRow(1, "ABCD", 21, time.Date(1999, time.July, 21, 0, 0, 0, 0, time.Local), "ABCD", 21, 100, 212121, 2121, 2323, "2121")
 
 	mock.ExpectQuery("^SELECT (.+) FROM blocks (.+)").WillReturnRows(rows)
 

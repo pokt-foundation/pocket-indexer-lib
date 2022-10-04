@@ -3,6 +3,7 @@ package indexer
 import (
 	"errors"
 	"strconv"
+	"time"
 
 	"github.com/pokt-foundation/pocket-go/provider"
 	"github.com/pokt-foundation/pocket-indexer-lib/types"
@@ -42,4 +43,65 @@ func (i *Indexer) IndexBlock(blockHeight int) error {
 	}
 
 	return i.driver.WriteBlock(convertProviderBlockToBlock(blockOutput))
+}
+
+// IndexBlockCalculatedFields indexes calculated fields for block in given height
+// Calculated fields are accounts, apps and nodes quantities and took
+// getTook input is necessary for custom indexing (first height won't have the previous block to calculate took value)
+func (i *Indexer) IndexBlockCalculatedFields(blockHeight int, getTook bool) error {
+	accountsQuantity, err := i.driver.GetAccountsQuantity(&types.GetAccountsQuantityOptions{
+		Height: blockHeight,
+	})
+	if err != nil {
+		return err
+	}
+
+	appsQuantity, err := i.driver.GetAppsQuantity(&types.GetAppsQuantityOptions{
+		Height: blockHeight,
+	})
+	if err != nil {
+		return err
+	}
+
+	nodesQuantity, err := i.driver.GetNodesQuantity(&types.GetNodesQuantityOptions{
+		Height: blockHeight,
+	})
+	if err != nil {
+		return err
+	}
+
+	var took time.Duration
+
+	if getTook {
+		took, err = i.getDuration(blockHeight)
+		if err != nil {
+			return err
+		}
+	}
+
+	return i.driver.WriteBlockCalculatedFields(&types.Block{
+		Height:           blockHeight,
+		AccountsQuantity: int(accountsQuantity),
+		AppsQuantity:     int(appsQuantity),
+		NodesQuantity:    int(nodesQuantity),
+		Took:             took,
+	})
+}
+
+func (i *Indexer) getDuration(blockHeight int) (time.Duration, error) {
+	if blockHeight == 1 {
+		return 0, nil
+	}
+
+	lastBlock, err := i.driver.ReadBlockByHeight(blockHeight - 1)
+	if err != nil {
+		return 0, err
+	}
+
+	heightBlock, err := i.driver.ReadBlockByHeight(blockHeight)
+	if err != nil {
+		return 0, err
+	}
+
+	return heightBlock.Time.Sub(lastBlock.Time), nil
 }

@@ -21,9 +21,9 @@ func TestIndexer_IndexBlockTransactions(t *testing.T) {
 
 	reqProvider := provider.NewProvider("https://dummy.com", []string{})
 
-	writerMock := &writerMock{}
+	driverMock := &driverMock{}
 
-	indexer := NewIndexer(reqProvider, writerMock)
+	indexer := NewIndexer(reqProvider, driverMock)
 
 	mock.AddMockedResponseFromFile(http.MethodPost, fmt.Sprintf("%s%s", "https://dummy.com", provider.QueryBlockTXsRoute),
 		http.StatusInternalServerError, "../samples/query_block_txs.json")
@@ -45,12 +45,12 @@ func TestIndexer_IndexBlockTransactions(t *testing.T) {
 			"../samples/query_block_txs_empty.json",
 		})
 
-	writerMock.On("WriteTransactions", testMock.Anything).Return(errors.New("forced failure")).Once()
+	driverMock.On("WriteTransactions", testMock.Anything).Return(errors.New("forced failure")).Once()
 
 	err = indexer.IndexBlockTransactions(30363)
 	c.EqualError(err, "forced failure")
 
-	writerMock.On("WriteTransactions", testMock.Anything).Return(nil).Once()
+	driverMock.On("WriteTransactions", testMock.Anything).Return(nil).Once()
 
 	err = indexer.IndexBlockTransactions(30363)
 	c.NoError(err)
